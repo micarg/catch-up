@@ -1,0 +1,506 @@
+<!doctype html>
+<html lang="el">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<title>Catch Up</title>
+<meta name="description" content="Οι σειρές που βλέπεις και πού έμεινες.">
+<meta name="theme-color" content="#000000">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Catch Up">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<style>
+/* Catch Up — black page, grey liquid-glass chrome (same tokens as Proza / Pocket Byte gallery).
+   One sticky glass search bar on top, poster shelf below, a glass sheet per show. */
+:root{
+  --bg:#000;--ink:#f5f5f7;--muted:#8e8e93;--dim:#5e5e63;
+  --glass:rgba(40,40,44,.58);--glass-strong:rgba(26,26,30,.78);--glass-soft:rgba(255,255,255,.06);
+  --stroke:rgba(255,255,255,.14);--line:rgba(255,255,255,.10);
+  --hi:inset 0 1px 0 rgba(255,255,255,.16),inset 0 -1px 0 rgba(0,0,0,.28);
+  --blur:saturate(180%) blur(22px);
+  --ui:-apple-system,BlinkMacSystemFont,"SF Pro Text","SF Pro Display",system-ui,"Segoe UI",Roboto,"Helvetica Neue",sans-serif;
+  --st:env(safe-area-inset-top,0px);--sb:env(safe-area-inset-bottom,0px);
+  color-scheme:dark;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--ui);-webkit-font-smoothing:antialiased;-webkit-text-size-adjust:100%}
+body{min-height:100vh;overscroll-behavior-y:none}
+body.locked{overflow:hidden}
+button{font:inherit;color:inherit;cursor:pointer}
+[hidden]{display:none!important}
+.glass{background:var(--glass);-webkit-backdrop-filter:var(--blur);backdrop-filter:var(--blur);border:.5px solid var(--stroke);box-shadow:var(--hi),0 6px 18px rgba(0,0,0,.35)}
+
+/* ---- search bar ---- */
+.top{position:sticky;top:0;z-index:5;padding:calc(var(--st) + 12px) 16px 14px}
+.top::before{content:"";position:absolute;inset:0 0 -18px;background:linear-gradient(#000 calc(var(--st) + 8px),rgba(0,0,0,.72) 62%,rgba(0,0,0,0));pointer-events:none;z-index:-1}
+.search{max-width:720px;margin:0 auto;height:48px;border-radius:16px;display:flex;align-items:center;gap:10px;padding:0 6px 0 14px}
+.search svg{width:18px;height:18px;flex:none;color:rgba(255,255,255,.62)}
+.search input{flex:1;min-width:0;height:100%;border:0;background:none;color:var(--ink);font:500 17px var(--ui);outline:none;-webkit-appearance:none;appearance:none}
+.search input::placeholder{color:rgba(255,255,255,.45)}
+.search input::-webkit-search-cancel-button{display:none}
+.search:focus-within{box-shadow:var(--hi),inset 0 0 0 1px rgba(255,255,255,.22),0 10px 26px rgba(0,0,0,.4)}
+.x{width:34px;height:34px;border-radius:50%;border:0;background:rgba(255,255,255,.12);display:grid;place-items:center;padding:0;flex:none}
+.x svg{width:12px;height:12px;color:#d1d1d6}
+
+/* ---- shelf ---- */
+.shelf{max-width:720px;margin:0 auto;padding:6px 16px calc(var(--sb) + 48px);display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:22px 12px}
+@media (min-width:560px){.shelf{grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:26px 16px}}
+.card{border:0;background:none;padding:0;text-align:left;display:block;min-width:0}
+.shelf.enter .card{animation:rise .45s cubic-bezier(.2,.8,.2,1) both;animation-delay:calc(var(--i,0) * 30ms)}
+@keyframes rise{from{opacity:0;transform:translateY(10px)}}
+.card:active .poster{transform:scale(.97)}
+.poster{position:relative;aspect-ratio:2/3;border-radius:14px;overflow:hidden;background:#1c1c1e;box-shadow:0 0 0 .5px var(--stroke),0 12px 26px rgba(0,0,0,.55);transition:transform .2s ease}
+.poster img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
+.poster::after{content:"";position:absolute;inset:0;border-radius:inherit;background:linear-gradient(170deg,rgba(255,255,255,.16),rgba(255,255,255,0) 32%);box-shadow:inset 0 0 0 .5px rgba(255,255,255,.18);pointer-events:none}
+.poster .ph{position:absolute;inset:0;display:flex;align-items:flex-end;padding:10px;font-weight:700;font-size:14px;line-height:1.15;color:#d1d1d6;background:linear-gradient(160deg,#2c2c30,#141416)}
+.bar{position:absolute;left:8px;right:8px;bottom:8px;height:4px;border-radius:3px;background:rgba(0,0,0,.45);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);box-shadow:inset 0 0 0 .5px rgba(255,255,255,.18);overflow:hidden;z-index:1}
+.bar i{display:block;height:100%;background:#fff;border-radius:3px}
+.l1{margin-top:9px;font-size:13px;font-weight:600;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.l2{margin-top:2px;font-size:11.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.l2.soon{color:#d1d1d6}
+.empty{grid-column:1/-1;text-align:center;color:var(--muted);font-size:15px;line-height:1.5;padding:22vh 24px 0}
+.empty b{display:block;color:var(--ink);font-size:17px;font-weight:600;margin-bottom:4px}
+
+/* ---- search results ---- */
+.results{max-width:720px;margin:0 auto;padding:4px 16px calc(var(--sb) + 40px);display:flex;flex-direction:column;gap:10px}
+.row{display:flex;align-items:center;gap:12px;padding:8px 10px 8px 8px;border-radius:18px;width:100%;text-align:left}
+.row .th{width:46px;height:68px;border-radius:9px;overflow:hidden;flex:none;background:#1c1c1e;box-shadow:0 0 0 .5px var(--stroke);position:relative}
+.row .th img{width:100%;height:100%;object-fit:cover;display:block}
+.row .tx{flex:1;min-width:0}
+.row .n{font-size:16px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row .m{font-size:13px;color:var(--muted);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.add{width:36px;height:36px;border-radius:50%;flex:none;display:grid;place-items:center;background:#f5f5f7;color:#000;box-shadow:0 3px 10px rgba(0,0,0,.35)}
+.add.on{background:rgba(255,255,255,.12);color:var(--ink);box-shadow:var(--hi)}
+.add svg{width:15px;height:15px}
+.note{color:var(--muted);text-align:center;font-size:14px;padding:30px 10px}
+
+/* ---- sheet ---- */
+.scrim{position:fixed;inset:0;z-index:20;background:rgba(0,0,0,.5);opacity:0;transition:opacity .3s ease}
+.scrim.on{opacity:1}
+.sheet{position:fixed;left:0;right:0;bottom:0;z-index:21;margin:0 auto;max-width:560px;max-height:calc(100% - var(--st) - 24px);overflow:hidden;display:flex;flex-direction:column;border-radius:30px 30px 0 0;background:var(--glass-strong);-webkit-backdrop-filter:var(--blur);backdrop-filter:var(--blur);border:.5px solid var(--stroke);border-bottom:0;box-shadow:var(--hi),0 -24px 60px rgba(0,0,0,.6);transform:translateY(105%);transition:transform .38s cubic-bezier(.2,.8,.2,1)}
+.sheet.on{transform:none}
+.sheet .art{position:absolute;inset:-40px;background-size:cover;background-position:center;filter:blur(46px) grayscale(1) brightness(.55);opacity:.55;z-index:-1;pointer-events:none}
+.grab{flex:none;padding:10px 0 4px;display:grid;place-items:center;touch-action:none}
+.grab i{width:38px;height:5px;border-radius:3px;background:rgba(255,255,255,.28)}
+.sx{position:absolute;top:14px;right:14px;width:34px;height:34px;border-radius:50%;display:grid;place-items:center;padding:0;z-index:2}
+.sx svg{width:12px;height:12px}
+.sbody{overflow-y:auto;-webkit-overflow-scrolling:touch;padding:6px 18px calc(var(--sb) + 22px);overscroll-behavior:contain}
+.hd{display:flex;gap:14px;align-items:flex-end;padding-right:36px}
+.hd .poster{width:92px;flex:none;border-radius:12px}
+.hd h2{margin:0;font-size:22px;line-height:1.15;font-weight:700;letter-spacing:-.02em}
+.hd .meta{color:var(--muted);font-size:13.5px;margin-top:6px;line-height:1.4}
+.box{margin-top:14px;border-radius:20px;padding:14px 16px;background:var(--glass-soft);border:.5px solid var(--line);box-shadow:inset 0 1px 0 rgba(255,255,255,.08)}
+.k{font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.v{font-size:17px;font-weight:600;margin-top:5px;line-height:1.3}
+.v small{display:block;font-size:13.5px;font-weight:500;color:var(--muted);margin-top:3px}
+.line{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0}
+.line+.line{border-top:.5px solid var(--line)}
+.line .lab{font-size:15px;font-weight:500}
+.line .lab small{display:block;font-size:12.5px;color:var(--muted);font-weight:500;margin-top:2px;max-width:150px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.step{display:flex;align-items:center;gap:6px}
+.sb{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;padding:0;font-size:22px;font-weight:400;line-height:1;background:var(--glass);border:.5px solid var(--stroke);box-shadow:var(--hi),0 4px 12px rgba(0,0,0,.3)}
+.sb:active{transform:scale(.92)}
+.num{width:58px;height:40px;border:0;background:none;color:var(--ink);text-align:center;font:600 26px var(--ui);font-variant-numeric:tabular-nums;outline:none;padding:0;border-radius:10px}
+.num:focus{background:rgba(255,255,255,.08)}
+.time{display:flex;align-items:center;gap:2px}
+.time .num{width:64px}
+.time .num.ss{width:46px;font-size:22px;color:#d1d1d6}
+.time span{font-size:22px;font-weight:600;color:var(--muted)}
+.unit{font-size:12px;color:var(--muted);text-align:right;margin-top:-2px}
+.done{margin-top:14px;width:100%;height:50px;border:0;border-radius:999px;background:#f5f5f7;color:#000;font-size:16px;font-weight:600;box-shadow:0 6px 18px rgba(0,0,0,.4)}
+.done:active{transform:scale(.98)}
+.saved{text-align:center;font-size:12.5px;color:var(--muted);height:18px;margin-top:10px;opacity:0;transition:opacity .25s}
+.saved.on{opacity:1}
+.rm{display:block;margin:6px auto 0;border:0;background:none;color:var(--dim);font-size:14px;padding:10px 14px}
+.rm.arm{color:#ff6961}
+</style>
+</head>
+<body>
+<header class="top">
+  <label class="search glass">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/></svg>
+    <input id="q" type="search" placeholder="Αναζήτηση σειράς" autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="search" aria-label="Αναζήτηση σειράς">
+    <button class="x" id="qx" type="button" aria-label="Καθαρισμός" hidden><svg viewBox="0 0 12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M2 2l8 8M10 2l-8 8"/></svg></button>
+  </label>
+</header>
+
+<main class="shelf" id="shelf"></main>
+<section class="results" id="results" hidden></section>
+
+<div class="scrim" id="scrim" hidden></div>
+<div class="sheet" id="sheet" role="dialog" aria-modal="true" hidden>
+  <div class="art" id="art"></div>
+  <div class="grab" id="grab"><i></i></div>
+  <button class="sx glass" id="sx" type="button" aria-label="Κλείσιμο"><svg viewBox="0 0 12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M2 2l8 8M10 2l-8 8"/></svg></button>
+  <div class="sbody" id="sbody"></div>
+</div>
+
+<script>
+'use strict';
+const API = 'https://api.tvmaze.com';
+const KEY = 'catchup-v1';
+const STALE = 3 * 3600e3;            // refresh show info after 3 hours
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+/* ---------- storage ---------- */
+let db = { shows: {} };
+try { const raw = localStorage.getItem(KEY); if (raw) db = JSON.parse(raw); } catch (e) {}
+if (!db || typeof db !== 'object' || !db.shows) db = { shows: {} };
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify(db)); } catch (e) {} };
+try { navigator.storage && navigator.storage.persist && navigator.storage.persist(); } catch (e) {}
+
+/* ---------- dates (Greek) ---------- */
+const DAY = 864e5;
+const tf = new Intl.DateTimeFormat('el-GR', { hour: '2-digit', minute: '2-digit', hour12: false });
+const wdS = new Intl.DateTimeFormat('el-GR', { weekday: 'short' });
+const wdL = new Intl.DateTimeFormat('el-GR', { weekday: 'long' });
+const dm = new Intl.DateTimeFormat('el-GR', { day: 'numeric', month: 'short' });
+const dmy = new Intl.DateTimeFormat('el-GR', { day: 'numeric', month: 'short', year: 'numeric' });
+const dmyL = new Intl.DateTimeFormat('el-GR', { day: 'numeric', month: 'long', year: 'numeric' });
+const cap = s => s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
+const clean = s => s.replace(/\./g, '');
+const midnight = d => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; };
+const dayDiff = d => Math.round((midnight(d) - midnight(new Date())) / DAY);
+const parseAir = ep => {
+  if (!ep) return null;
+  if (ep.airstamp) return { d: new Date(ep.airstamp), timed: true };
+  if (ep.airdate) return { d: new Date(ep.airdate + 'T12:00:00'), timed: false };
+  return null;
+};
+function whenShort(a) {
+  const n = dayDiff(a.d), t = a.timed ? ' ' + tf.format(a.d) : '';
+  if (n === 0) return 'Σήμερα' + t;
+  if (n === 1) return 'Αύριο' + t;
+  if (n > 1 && n < 7) return cap(clean(wdS.format(a.d))) + t;
+  return clean(a.d.getFullYear() === new Date().getFullYear() ? dm.format(a.d) : dmy.format(a.d));
+}
+function whenLong(a) {
+  const n = dayDiff(a.d), t = a.timed ? ', ' + tf.format(a.d) : '';
+  if (n === 0) return 'Σήμερα' + t;
+  if (n === 1) return 'Αύριο' + t;
+  const base = cap(wdL.format(a.d)) + ' ' + clean(a.d.getFullYear() === new Date().getFullYear() ? dm.format(a.d) : dmy.format(a.d));
+  return base + t;
+}
+const fmtTime = sec => {
+  sec = Math.max(0, Math.round(sec || 0));
+  const h = Math.floor(sec / 3600), m = Math.floor(sec % 3600 / 60), s = sec % 60;
+  return h ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}` : `${m}:${String(s).padStart(2, '0')}`;
+};
+
+/* ---------- show helpers ---------- */
+const multi = sh => (sh.seasons && sh.seasons.length > 1) || (sh.p && sh.p.s > 1);
+const epLabel = (sh, s, e) => multi(sh) ? `S${s} E${e}` : `E${e}`;
+const year = sh => sh.premiered ? sh.premiered.slice(0, 4) : '';
+const netName = sh => sh.network || '';
+const maxAired = (sh, s) => sh.aired && sh.aired.by ? sh.aired.by[s] || 0 : 0;
+
+function nextInfo(sh) {
+  const a = parseAir(sh.next);
+  if (a) {
+    const lab = epLabel(sh, sh.next.season, sh.next.number);
+    return { short: 'Νέο: ' + whenShort(a), long: whenLong(a), sub: lab + (sh.next.name && !/^(episode|επεισόδιο)\s*\d+$/i.test(sh.next.name.trim()) ? ' · ' + sh.next.name : ''), soon: dayDiff(a.d) <= 1, k: 'Επόμενο επεισόδιο' };
+  }
+  const lastS = (sh.aired && sh.aired.maxS) || (sh.prev && sh.prev.season) || 0;
+  const up = (sh.seasons || []).filter(x => x.n > lastS).sort((x, y) => x.n - y.n)[0];
+  if (up) {
+    if (up.premiere) {
+      const a2 = { d: new Date(up.premiere + 'T12:00:00'), timed: false };
+      return { short: `S${up.n}: ` + clean(dmy.format(a2.d)), long: dmyL.format(a2.d), sub: `Πρεμιέρα σεζόν ${up.n}`, k: 'Νέα σεζόν' };
+    }
+    return { short: `S${up.n}: ανακοινώθηκε`, long: `Η σεζόν ${up.n} έχει ανακοινωθεί`, sub: 'Χωρίς ημερομηνία ακόμα', k: 'Νέα σεζόν' };
+  }
+  if (sh.status === 'Ended') return { short: 'Ολοκληρώθηκε', long: 'Η σειρά ολοκληρώθηκε', sub: 'Δεν θα βγουν νέα επεισόδια', k: 'Κατάσταση' };
+  const pa = parseAir(sh.prev);
+  if (pa && Date.now() - pa.d < 14 * DAY) return { short: 'Νέο: χωρίς πρόγραμμα', long: 'Δεν βγήκε ακόμα πρόγραμμα', sub: 'Τελευταίο: ' + epLabel(sh, sh.prev.season, sh.prev.number) + ' · ' + whenLong(pa), k: 'Επόμενο επεισόδιο' };
+  if (!sh.fetched) return { short: '', long: '…', sub: '', k: 'Επόμενο επεισόδιο' };
+  return { short: 'Νέα σεζόν: άγνωστο', long: 'Η σεζόν τελείωσε', sub: 'Η επόμενη δεν έχει ανακοινωθεί ακόμα', k: 'Νέα σεζόν' };
+}
+
+/* ---------- TVmaze ---------- */
+async function get(path) {
+  const r = await fetch(API + path);
+  if (r.status === 429) { await new Promise(res => setTimeout(res, 2500)); return get(path); }
+  if (!r.ok) throw new Error(r.status);
+  return r.json();
+}
+const fromShow = s => ({
+  id: s.id, name: s.name,
+  img: s.image ? s.image.medium : '', imgL: s.image ? s.image.original : '',
+  network: (s.network && s.network.name) || (s.webChannel && s.webChannel.name) || '',
+  status: s.status || '', premiered: s.premiered || '', lang: s.language || '',
+  runtime: s.averageRuntime || s.runtime || 0
+});
+const pickEp = e => e ? { season: e.season, number: e.number, name: e.name || '', airdate: e.airdate || '', airstamp: e.airstamp || '' } : null;
+
+const refreshing = new Set();
+async function refresh(id) {
+  if (refreshing.has(id)) return;
+  refreshing.add(id);
+  try {
+    const [s, seasons, eps] = await Promise.all([
+      get(`/shows/${id}?embed[]=nextepisode&embed[]=previousepisode`),
+      get(`/shows/${id}/seasons`),
+      get(`/shows/${id}/episodes`)
+    ]);
+    const sh = db.shows[id]; if (!sh) return;
+    Object.assign(sh, fromShow(s));
+    const em = s._embedded || {};
+    sh.next = pickEp(em.nextepisode);
+    sh.prev = pickEp(em.previousepisode);
+    sh.seasons = (seasons || []).map(x => ({ n: x.number, premiere: x.premiereDate || '', end: x.endDate || '', order: x.episodeOrder || 0 })).filter(x => x.n != null);
+    const now = Date.now(), by = {}, names = {};
+    let total = 0, maxS = 0;
+    for (const e of eps || []) {
+      if (e.number == null || e.season == null) continue;
+      const a = parseAir(e);
+      if (!a || a.d.getTime() > now) continue;
+      total++; maxS = Math.max(maxS, e.season);
+      by[e.season] = Math.max(by[e.season] || 0, e.number);
+      if (e.name && !/^(episode|επεισόδιο)\s*\d+$/i.test(e.name.trim())) names[e.season + '-' + e.number] = e.name;
+    }
+    sh.aired = { total, by, maxS };
+    sh.names = names;
+    if (!sh.p.s) sh.p.s = maxS || (sh.seasons[0] && sh.seasons[0].n) || 1;
+    sh.fetched = Date.now();
+    save(); render();
+    if (openId === id) { if (sbody.contains(document.activeElement) && document.activeElement.tagName === 'INPUT') sheetDirty = true; else renderSheet(); }
+  } catch (e) {
+    /* offline or API hiccup: keep what we have */
+  } finally { refreshing.delete(id); }
+}
+async function refreshStale(force) {
+  const ids = Object.keys(db.shows).filter(id => force || !db.shows[id].fetched || Date.now() - db.shows[id].fetched > STALE);
+  for (const id of ids) { await refresh(+id); await new Promise(r => setTimeout(r, 350)); }
+}
+
+/* ---------- shelf ---------- */
+const shelf = $('shelf'), results = $('results');
+const order = () => Object.values(db.shows).sort((a, b) => (b.p.at || b.added) - (a.p.at || a.added));
+function posterHTML(sh, withBar) {
+  const img = sh.img ? `<img src="${esc(sh.img)}" alt="" loading="lazy" decoding="async">` : `<div class="ph">${esc(sh.name)}</div>`;
+  let bar = '';
+  if (withBar && sh.p.e > 0 && sh.p.t > 0 && sh.runtime) {
+    const f = Math.min(1, sh.p.t / (sh.runtime * 60));
+    bar = `<div class="bar"><i style="width:${(f * 100).toFixed(1)}%"></i></div>`;
+  }
+  return `<div class="poster">${img}${bar}</div>`;
+}
+let firstPaint = true;
+function render() {
+  const list = order();
+  if (firstPaint) { firstPaint = false; shelf.classList.add('enter'); setTimeout(() => shelf.classList.remove('enter'), 1200); }
+  if (!list.length) {
+    shelf.innerHTML = `<div class="empty"><b>Η βιβλιοθήκη σου είναι άδεια</b>Ψάξε μια σειρά πάνω για να την προσθέσεις.</div>`;
+    return;
+  }
+  shelf.innerHTML = list.map((sh, i) => {
+    const ni = nextInfo(sh);
+    const p = sh.p.e > 0 ? epLabel(sh, sh.p.s || 1, sh.p.e) + (sh.p.t > 0 ? ' · ' + fmtTime(sh.p.t) : '') : 'Δεν ξεκίνησε';
+    return `<button class="card" type="button" data-id="${sh.id}" style="--i:${i}" aria-label="${esc(sh.name)}">${posterHTML(sh, true)}<div class="l1">${esc(p)}</div><div class="l2${ni.soon ? ' soon' : ''}">${esc(ni.short || ' ')}</div></button>`;
+  }).join('');
+}
+shelf.addEventListener('click', e => { const c = e.target.closest('.card'); if (c) openSheet(+c.dataset.id); });
+
+/* ---------- search ---------- */
+const q = $('q'), qx = $('qx');
+let qTimer = 0, qSeq = 0, lastHits = [];
+function showSearch(on) { results.hidden = !on; shelf.hidden = on; qx.hidden = !q.value; }
+q.addEventListener('input', () => {
+  const v = q.value.trim();
+  qx.hidden = !q.value;
+  clearTimeout(qTimer);
+  if (!v) { showSearch(false); return; }
+  showSearch(true);
+  if (!lastHits.length) results.innerHTML = `<div class="note">Ψάχνω…</div>`;
+  qTimer = setTimeout(() => runSearch(v), 280);
+});
+q.addEventListener('keydown', e => { if (e.key === 'Enter') { clearTimeout(qTimer); const v = q.value.trim(); if (v) runSearch(v); q.blur(); } });
+qx.addEventListener('click', e => { e.preventDefault(); q.value = ''; lastHits = []; showSearch(false); q.focus(); });
+function greekToLatin(t) {
+  if (!/[\u0370-\u03ff\u1f00-\u1fff]/.test(t)) return '';
+  t = t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  const pairs = [['ντ', 'd'], ['μπ', 'b'], ['γκ', 'g'], ['γγ', 'ng'], ['ου', 'ou'], ['αι', 'e'], ['ει', 'i'], ['οι', 'i'], ['τσ', 'ts'], ['τζ', 'tz'], ['θ', 'th'], ['χ', 'ch'], ['ψ', 'ps'], ['ξ', 'x']];
+  for (const [g, l] of pairs) t = t.split(g).join(l);
+  const m = { α: 'a', β: 'v', γ: 'g', δ: 'd', ε: 'e', ζ: 'z', η: 'i', ι: 'i', κ: 'k', λ: 'l', μ: 'm', ν: 'n', ο: 'o', π: 'p', ρ: 'r', σ: 's', ς: 's', τ: 't', υ: 'y', φ: 'f', ω: 'o' };
+  return t.replace(/[α-ω]/g, c => m[c] || c);
+}
+async function runSearch(v) {
+  const seq = ++qSeq;
+  try {
+    // Greek titles: also search the Latin spelling (Ντέρτι → derti), since TVmaze often keeps both
+    const qs = [v]; const lat = greekToLatin(v); if (lat && lat !== v.toLowerCase()) qs.push(lat);
+    const all = await Promise.all(qs.map(x => get('/search/shows?q=' + encodeURIComponent(x)).catch(() => [])));
+    if (seq !== qSeq) return;
+    const seen = new Set(); lastHits = [];
+    for (const h of all.flat().sort((x, y) => y.score - x.score)) if (!seen.has(h.show.id)) { seen.add(h.show.id); lastHits.push(h.show); }
+    renderHits();
+  } catch (e) {
+    if (seq !== qSeq) return;
+    results.innerHTML = `<div class="note">Δεν υπάρχει σύνδεση. Δοκίμασε ξανά.</div>`;
+  }
+}
+function renderHits() {
+  if (!lastHits.length) { results.innerHTML = `<div class="note">Δεν βρέθηκε κάτι. Δοκίμασε με άλλη γραφή, π.χ. στα αγγλικά.</div>`; return; }
+  results.innerHTML = lastHits.map(s => {
+    const have = !!db.shows[s.id];
+    const meta = [s.premiered ? s.premiered.slice(0, 4) : '', (s.network && s.network.name) || (s.webChannel && s.webChannel.name) || '', s.status === 'Ended' ? 'Ολοκληρώθηκε' : ''].filter(Boolean).join(' · ');
+    const img = s.image ? `<img src="${esc(s.image.medium)}" alt="" loading="lazy">` : '';
+    const ic = have
+      ? `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.5l3.2 3L13 4.5"/></svg>`
+      : `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M8 2.5v11M2.5 8h11"/></svg>`;
+    return `<button class="row glass" type="button" data-id="${s.id}"><div class="th">${img}</div><div class="tx"><div class="n">${esc(s.name)}</div><div class="m">${esc(meta || ' ')}</div></div><span class="add${have ? ' on' : ''}" aria-hidden="true">${ic}</span></button>`;
+  }).join('');
+}
+results.addEventListener('click', e => {
+  const r = e.target.closest('.row'); if (!r) return;
+  const id = +r.dataset.id;
+  if (!db.shows[id]) {
+    const s = lastHits.find(x => x.id === id); if (!s) return;
+    db.shows[id] = Object.assign(fromShow(s), { added: Date.now(), p: { s: 0, e: 0, t: 0, at: 0 }, fetched: 0 });
+    save();
+    refresh(id);
+  }
+  q.value = ''; lastHits = []; showSearch(false); q.blur();
+  render(); openSheet(id);
+});
+
+/* ---------- sheet ---------- */
+const sheet = $('sheet'), scrim = $('scrim'), sbody = $('sbody');
+let openId = null, savedT = 0, sheetDirty = false;
+function openSheet(id) {
+  openId = id;
+  renderSheet();
+  scrim.hidden = false; sheet.hidden = false;
+  document.body.classList.add('locked');
+  requestAnimationFrame(() => requestAnimationFrame(() => { scrim.classList.add('on'); sheet.classList.add('on'); }));
+  sbody.scrollTop = 0;
+  const sh = db.shows[id];
+  if (sh && (!sh.fetched || Date.now() - sh.fetched > 10 * 60e3)) refresh(id);
+}
+function closeSheet() {
+  if (openId == null) return;
+  document.activeElement && document.activeElement.blur && document.activeElement.blur();
+  scrim.classList.remove('on'); sheet.classList.remove('on'); sheet.style.transform = '';
+  document.body.classList.remove('locked');
+  openId = null;
+  setTimeout(() => { if (openId == null) { scrim.hidden = true; sheet.hidden = true; } }, 380);
+  render();
+}
+scrim.addEventListener('click', closeSheet);
+$('sx').addEventListener('click', closeSheet);
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeSheet(); });
+
+function renderSheet() {
+  const sh = db.shows[openId]; if (!sh) return;
+  $('art').style.backgroundImage = sh.img ? `url("${sh.img}")` : 'none';
+  const ni = nextInfo(sh);
+  const s = sh.p.s || 1, e = sh.p.e || 0;
+  const mx = maxAired(sh, s);
+  const nm = sh.names && sh.names[s + '-' + e];
+  const meta = [netName(sh), year(sh)].filter(Boolean).join(' · ');
+  const airedTxt = sh.aired ? (multi(sh) && mx ? `Στη σεζόν ${s} παίχτηκαν ${mx} επεισόδια` : `Έχουν παιχτεί ${sh.aired.total} επεισόδια`) : '';
+  const tm = Math.floor((sh.p.t || 0) / 60), ts = (sh.p.t || 0) % 60;
+  sbody.innerHTML = `
+    <div class="hd">${posterHTML(sh, false)}<div><h2>${esc(sh.name)}</h2><div class="meta">${esc(meta)}${airedTxt ? '<br>' + esc(airedTxt) : ''}</div></div></div>
+    <div class="box"><div class="k">${esc(ni.k)}</div><div class="v">${esc(ni.long)}${ni.sub ? `<small>${esc(ni.sub)}</small>` : ''}</div></div>
+    <div class="box">
+      <div class="k">Έμεινα</div>
+      ${multi(sh) || (sh.seasons && sh.seasons.length > 1) ? `
+      <div class="line"><div class="lab">Σεζόν</div><div class="step">
+        <button class="sb" type="button" data-a="s-" aria-label="Προηγούμενη σεζόν">−</button>
+        <input class="num" id="vs" inputmode="numeric" pattern="[0-9]*" value="${s}" aria-label="Σεζόν">
+        <button class="sb" type="button" data-a="s+" aria-label="Επόμενη σεζόν">+</button></div></div>` : ''}
+      <div class="line"><div class="lab">Επεισόδιο${mx ? `<small>από ${mx}${nm ? ' · ' + esc(nm) : ''}</small>` : (nm ? `<small>${esc(nm)}</small>` : '')}</div><div class="step">
+        <button class="sb" type="button" data-a="e-" aria-label="Προηγούμενο επεισόδιο">−</button>
+        <input class="num" id="ve" inputmode="numeric" pattern="[0-9]*" value="${e || ''}" placeholder="0" aria-label="Επεισόδιο">
+        <button class="sb" type="button" data-a="e+" aria-label="Επόμενο επεισόδιο">+</button></div></div>
+      <div class="line"><div class="lab">Λεπτό<small>λεπτά : δευτ.</small></div><div class="time">
+        <input class="num" id="vm" inputmode="numeric" pattern="[0-9]*" value="${sh.p.t ? tm : ''}" placeholder="0" aria-label="Λεπτά">
+        <span>:</span>
+        <input class="num ss" id="vss" inputmode="numeric" pattern="[0-9]*" value="${sh.p.t ? String(ts).padStart(2, '0') : ''}" placeholder="00" aria-label="Δευτερόλεπτα"></div></div>
+    </div>
+    <button class="done" type="button" data-a="fin">${e > 0 ? 'Το τελείωσα · πάμε στο επόμενο' : 'Ξεκινώ από το 1ο επεισόδιο'}</button>
+    <div class="saved" id="saved">Αποθηκεύτηκε</div>
+    <button class="rm" type="button" data-a="rm">Αφαίρεση από τη βιβλιοθήκη</button>`;
+}
+function flashSaved() {
+  const el = $('saved'); if (!el) return;
+  el.classList.add('on'); clearTimeout(savedT); savedT = setTimeout(() => el.classList.remove('on'), 1100);
+}
+function commit(rerender) {
+  const sh = db.shows[openId]; if (!sh) return;
+  sh.p.at = Date.now(); save(); flashSaved();
+  if (rerender) { const y = sbody.scrollTop; renderSheet(); sbody.scrollTop = y; flashSaved(); }
+}
+let rmArm = 0;
+sbody.addEventListener('click', ev => {
+  const b = ev.target.closest('[data-a]'); if (!b) return;
+  const sh = db.shows[openId]; if (!sh) return;
+  const p = sh.p, a = b.dataset.a;
+  if (a === 's-') { if ((p.s || 1) > 1) { p.s = (p.s || 1) - 1; p.e = p.e ? 1 : 0; p.t = 0; } }
+  else if (a === 's+') { p.s = (p.s || 1) + 1; p.e = p.e ? 1 : 0; p.t = 0; }
+  else if (a === 'e-') { if (p.e > 1) { p.e--; p.t = 0; } else if (p.e === 1) { p.e = 0; p.t = 0; } }
+  else if (a === 'e+') { p.e = (p.e || 0) + 1; p.t = 0; }
+  else if (a === 'fin') {
+    if (!p.s) p.s = 1;
+    const mx = maxAired(sh, p.s);
+    const nextS = (sh.seasons || []).some(x => x.n === p.s + 1) && maxAired(sh, p.s + 1) > 0;
+    if (p.e > 0 && mx && p.e >= mx && nextS) { p.s++; p.e = 1; } else p.e = (p.e || 0) + 1;
+    p.t = 0;
+  }
+  else if (a === 'rm') {
+    if (Date.now() - rmArm < 3000) { delete db.shows[openId]; save(); closeSheet(); return; }
+    rmArm = Date.now(); b.classList.add('arm'); b.textContent = 'Πάτα ξανά για αφαίρεση';
+    setTimeout(() => { if (b.isConnected) { b.classList.remove('arm'); b.textContent = 'Αφαίρεση από τη βιβλιοθήκη'; } }, 3000);
+    return;
+  }
+  if (navigator.vibrate) try { navigator.vibrate(8); } catch (e) {}
+  commit(true);
+});
+const int = v => { const n = parseInt(String(v).replace(/\D/g, ''), 10); return isNaN(n) ? 0 : n; };
+let inT = 0;
+sbody.addEventListener('input', ev => {
+  const el = ev.target; if (!el.classList.contains('num')) return;
+  el.value = el.value.replace(/\D/g, '').slice(0, el.id === 'vss' ? 2 : 4);
+  const sh = db.shows[openId]; if (!sh) return;
+  const p = sh.p;
+  if (el.id === 'vs') p.s = Math.max(1, int(el.value) || 1);
+  if (el.id === 've') { p.e = int(el.value); const f = sbody.querySelector('[data-a="fin"]'); if (f) f.textContent = p.e > 0 ? 'Το τελείωσα · πάμε στο επόμενο' : 'Ξεκινώ από το 1ο επεισόδιο'; }
+  if (el.id === 'vm' || el.id === 'vss') {
+    const m = int($('vm').value), s = Math.min(59, int($('vss').value));
+    p.t = m * 60 + s;
+  }
+  clearTimeout(inT); inT = setTimeout(() => commit(false), 250);
+});
+sbody.addEventListener('focusout', ev => {
+  const el = ev.target; if (!el.classList || !el.classList.contains('num')) return;
+  if (el.id === 'vss' && el.value) el.value = String(Math.min(59, int(el.value))).padStart(2, '0');
+  setTimeout(() => { if (sheetDirty && !(sbody.contains(document.activeElement) && document.activeElement.tagName === 'INPUT')) { sheetDirty = false; const y = sbody.scrollTop; renderSheet(); sbody.scrollTop = y; } }, 0);
+});
+sbody.addEventListener('focusin', ev => { if (ev.target.classList && ev.target.classList.contains('num')) setTimeout(() => ev.target.select && ev.target.select(), 0); });
+
+/* swipe the sheet down to close */
+(() => {
+  let y0 = null, dy = 0;
+  const start = e => { if (e.target.closest('#sbody') && sbody.scrollTop > 0) return; y0 = e.touches[0].clientY; dy = 0; sheet.style.transition = 'none'; };
+  const move = e => { if (y0 == null) return; dy = Math.max(0, e.touches[0].clientY - y0); if (dy > 0) { sheet.style.transform = `translateY(${dy}px)`; if (e.cancelable && !e.target.closest('input')) e.preventDefault(); } };
+  const end = () => { if (y0 == null) return; sheet.style.transition = ''; y0 = null; if (dy > 110) closeSheet(); else sheet.style.transform = ''; };
+  sheet.addEventListener('touchstart', start, { passive: true });
+  sheet.addEventListener('touchmove', move, { passive: false });
+  sheet.addEventListener('touchend', end); sheet.addEventListener('touchcancel', end);
+})();
+
+/* ---------- boot ---------- */
+render();
+refreshStale(false);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) { render(); refreshStale(false); } });
+setInterval(() => { if (!document.hidden && openId == null) render(); }, 60e3);
+if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
+</script>
+</body>
+</html>
