@@ -51,7 +51,9 @@ button{font:inherit;color:inherit;cursor:pointer}
 /* ---- shelf ---- */
 .shelf{max-width:720px;margin:0 auto;padding:6px 16px calc(var(--sb) + 48px);display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:22px 12px}
 @media (min-width:560px){.shelf{grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:26px 16px}}
-.card{border:0;background:none;padding:0;text-align:left;display:block;min-width:0}
+.card{border:0;background:none;padding:0;text-align:left;display:flex;flex-direction:column;justify-content:flex-start;align-self:start;width:100%;min-width:0}
+.card .poster{width:100%;flex:none}
+.card .l1,.card .l2{height:1.3em;line-height:1.3em}
 .shelf.enter .card{animation:rise .45s cubic-bezier(.2,.8,.2,1) both;animation-delay:calc(var(--i,0) * 30ms)}
 @keyframes rise{from{opacity:0;transform:translateY(10px)}}
 .card:active .poster{transform:scale(.97)}
