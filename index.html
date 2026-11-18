@@ -121,8 +121,13 @@ button{font:inherit;color:inherit;cursor:pointer}
 .num{width:58px;height:40px;border:0;background:none;color:var(--ink);text-align:center;font:600 26px var(--ui);font-variant-numeric:tabular-nums;outline:none;padding:0;border-radius:10px}
 .num:focus{background:rgba(255,255,255,.08)}
 .time{display:flex;align-items:center;gap:2px}
-.time .num{width:64px}
-.time .num.ss{width:46px;font-size:22px;color:#d1d1d6}
+.time .num{width:46px;font-size:24px}
+.time .num.hh{width:34px}
+.time span{font-size:20px!important}
+.time .num.ss{color:#d1d1d6}
+.save{margin-top:14px;width:100%;height:50px;border:0;border-radius:999px;background:#f5f5f7;color:#000;font-size:16px;font-weight:600;box-shadow:0 6px 18px rgba(0,0,0,.4)}
+.save:active{transform:scale(.98)}
+.done.sec{margin-top:10px;background:var(--glass);color:var(--ink);border:.5px solid var(--stroke);box-shadow:var(--hi)}
 .time span{font-size:22px;font-weight:600;color:var(--muted)}
 .unit{font-size:12px;color:var(--muted);text-align:right;margin-top:-2px}
 .done{margin-top:14px;width:100%;height:50px;border:0;border-radius:999px;background:#f5f5f7;color:#000;font-size:16px;font-weight:600;box-shadow:0 6px 18px rgba(0,0,0,.4)}
@@ -362,7 +367,7 @@ function render() {
   }
   shelf.innerHTML = list.map((sh, i) => {
     const ni = nextInfo(sh);
-    const p = sh.p.e > 0 ? epLabel(sh, sh.p.s || 1, sh.p.e) + (sh.p.t > 0 ? ' · ' + fmtTime(sh.p.t) : '') : 'Δεν ξεκίνησε';
+    const p = sh.p.e > 0 ? `S${sh.p.s || 1} E${sh.p.e}` + (sh.p.t > 0 ? ' · ' + fmtTime(sh.p.t) : '') : 'Δεν ξεκίνησε';
     return `<button class="card" type="button" data-id="${sh.id}" style="--i:${i}" aria-label="${esc(sh.name)}">${posterHTML(sh, true)}<div class="l1">${esc(p)}</div><div class="l2${ni.soon ? ' soon' : ''}">${esc(ni.short || ' ')}</div></button>`;
   }).join('');
 }
@@ -507,7 +512,7 @@ function renderSheet() {
   const nm = sh.names && sh.names[s + '-' + e];
   const meta = [netName(sh), year(sh)].filter(Boolean).join(' · ');
   const airedTxt = sh.aired && !(e > mx0) ? (multi(sh) && mx ? `Στη σεζόν ${s} παίχτηκαν ${mx} επεισόδια` : `Έχουν παιχτεί ${sh.aired.total} επεισόδια`) : '';
-  const tm = Math.floor((sh.p.t || 0) / 60), ts = (sh.p.t || 0) % 60;
+  const T = sh.p.t || 0, th = Math.floor(T / 3600), tm = Math.floor(T % 3600 / 60), ts = T % 60;
   sbody.innerHTML = `
     <div class="hd"><div data-a="poster" style="position:relative;flex:none" role="button" aria-label="Αλλαγή αφίσας">${posterHTML(sh, false).replace('<div class="ph">' + esc(sh.name), '<div class="ph">' + (sh.manual && !sh.cimg ? 'Πάτα για αφίσα' : esc(sh.name)))}<span class="pen"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10.5 2.5l3 3L5 14H2v-3z"/></svg></span></div><div style="flex:1;min-width:0">${sh.manual ? `<textarea class="nm" id="vn" rows="2" aria-label="Όνομα σειράς" autocomplete="off" spellcheck="false">${esc(sh.name)}</textarea>` : `<h2>${esc(sh.name)}</h2>`}<div class="meta">${esc(meta)}${airedTxt ? '<br>' + esc(airedTxt) : ''}</div>${sh.manual && !sh.img && !sh.cimg && sh.posterTried ? `<a class="glink" href="https://www.google.com/search?tbm=isch&q=${encodeURIComponent(sh.name + ' σειρά αφίσα')}" target="_blank" rel="noopener">Βρες αφίσα στο Google</a>` : ''}</div></div>
     <div class="box"><div class="k">${esc(ni.k)}</div><div class="v">${esc(ni.long)}${ni.sub ? `<small>${esc(ni.sub)}</small>` : ''}</div></div>
@@ -523,12 +528,15 @@ function renderSheet() {
         <button class="sb" type="button" data-a="e-" aria-label="Προηγούμενο επεισόδιο">−</button>
         <input class="num" id="ve" inputmode="numeric" pattern="[0-9]*" value="${e || ''}" placeholder="0" aria-label="Επεισόδιο">
         <button class="sb" type="button" data-a="e+" aria-label="Επόμενο επεισόδιο"${L && L.E(s) && e >= L.E(s) ? ' disabled' : ''}>+</button></div></div>
-      <div class="line"><div class="lab">Λεπτό<small>λεπτά : δευτ.</small></div><div class="time">
-        <input class="num" id="vm" inputmode="numeric" pattern="[0-9]*" value="${sh.p.t ? tm : ''}" placeholder="0" aria-label="Λεπτά">
+      <div class="line"><div class="lab">Χρόνος<small>ώρα : λεπ : δευτ</small></div><div class="time">
+        <input class="num hh" id="vh" inputmode="numeric" pattern="[0-9]*" value="${T ? th : ''}" placeholder="0" aria-label="Ώρες">
         <span>:</span>
-        <input class="num ss" id="vss" inputmode="numeric" pattern="[0-9]*" value="${sh.p.t ? String(ts).padStart(2, '0') : ''}" placeholder="00" aria-label="Δευτερόλεπτα"></div></div>
+        <input class="num" id="vm" inputmode="numeric" pattern="[0-9]*" value="${T ? String(tm).padStart(2, '0') : ''}" placeholder="00" aria-label="Λεπτά">
+        <span>:</span>
+        <input class="num ss" id="vss" inputmode="numeric" pattern="[0-9]*" value="${T ? String(ts).padStart(2, '0') : ''}" placeholder="00" aria-label="Δευτερόλεπτα"></div></div>
     </div>
-    ${L && s >= L.S && L.E(s) && e >= L.E(s) ? `<button class="done" type="button" disabled>Είσαι στο τελευταίο επεισόδιο</button>` : `<button class="done" type="button" data-a="fin">${e > 0 ? 'Το τελείωσα · πάμε στο επόμενο' : 'Ξεκινώ από το 1ο επεισόδιο'}</button>`}
+    <button class="save" type="button" data-a="save">Αποθήκευση</button>
+    ${L && s >= L.S && L.E(s) && e >= L.E(s) ? `<button class="done sec" type="button" disabled>Είσαι στο τελευταίο επεισόδιο</button>` : `<button class="done sec" type="button" data-a="fin">${e > 0 ? 'Το τελείωσα · πάμε στο επόμενο' : 'Ξεκινώ από το 1ο επεισόδιο'}</button>`}
     <div class="saved" id="saved">Αποθηκεύτηκε</div>
     <button class="rm" type="button" data-a="rm">Αφαίρεση από τη βιβλιοθήκη</button>`;
 }
@@ -562,6 +570,7 @@ sbody.addEventListener('click', ev => {
   }
   else if (a === 'poster') { $('pf').click(); return; }
   else if (a === 'cam') { $('cf').click(); return; }
+  else if (a === 'save') { clearTimeout(inT); commit(false); closeSheet(); return; }
   else if (a === 'scan-ok') { const r = scanResult; if (!r) return; if (r.s) p.s = r.s; if (r.e) p.e = r.e; if (r.t != null) p.t = r.t; scanResult = null; clampP(sh); }
   else if (a === 'scan-no') { scanResult = null; $('scan').innerHTML = ''; return; }
   else if (a === 'rm') {
@@ -694,13 +703,13 @@ const int = v => { const n = parseInt(String(v).replace(/\D/g, ''), 10); return 
 let inT = 0;
 sbody.addEventListener('input', ev => {
   const el = ev.target; if (!el.classList.contains('num')) return;
-  el.value = el.value.replace(/\D/g, '').slice(0, el.id === 'vss' ? 2 : 4);
+  el.value = el.value.replace(/\D/g, '').slice(0, el.id === 'vss' || el.id === 'vm' || el.id === 'vh' ? 2 : 4);
   const sh = db.shows[openId]; if (!sh) return;
   const p = sh.p;
   if (el.id === 'vs') { p.s = Math.max(1, int(el.value) || 1); if (clampP(sh)) { el.value = p.s; const y = sbody.scrollTop; setTimeout(() => { renderSheet(); sbody.scrollTop = y; }, 0); } }
   if (el.id === 've') { p.e = int(el.value); if (clampP(sh)) el.value = p.e; const f = sbody.querySelector('[data-a="fin"]'); if (f) f.textContent = p.e > 0 ? 'Το τελείωσα · πάμε στο επόμενο' : 'Ξεκινώ από το 1ο επεισόδιο'; }
-  if (el.id === 'vm' || el.id === 'vss') {
-    const m = int($('vm').value), s = Math.min(59, int($('vss').value));
+  if (el.id === 'vh' || el.id === 'vm' || el.id === 'vss') {
+    const m = int($('vm').value) + int($('vh').value) * 60, s = Math.min(59, int($('vss').value));
     p.t = m * 60 + s;
   }
   clearTimeout(inT); inT = setTimeout(() => commit(false), 250);
@@ -708,6 +717,7 @@ sbody.addEventListener('input', ev => {
 sbody.addEventListener('focusout', ev => {
   const el = ev.target; if (!el.classList || !el.classList.contains('num')) return;
   if (el.id === 'vss' && el.value) el.value = String(Math.min(59, int(el.value))).padStart(2, '0');
+  if (el.id === 'vm' && el.value) el.value = String(int(el.value)).padStart(2, '0');
   setTimeout(() => { if (sheetDirty && !(sbody.contains(document.activeElement) && document.activeElement.tagName === 'INPUT')) { sheetDirty = false; const y = sbody.scrollTop; renderSheet(); sbody.scrollTop = y; } }, 0);
 });
 sbody.addEventListener('focusin', ev => { if (ev.target.classList && ev.target.classList.contains('num')) setTimeout(() => ev.target.select && ev.target.select(), 0); });
