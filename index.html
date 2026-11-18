@@ -54,6 +54,11 @@ button{font:inherit;color:inherit;cursor:pointer}
 .card{border:0;background:none;padding:0;text-align:left;display:flex;flex-direction:column;justify-content:flex-start;align-self:start;width:100%;min-width:0}
 .card .poster{width:100%;flex:none}
 .card .l1,.card .l2{height:1.3em;line-height:1.3em}
+/* a new episode is out past where you stopped: the poster glows */
+.card.fresh .poster{box-shadow:0 0 0 1.5px rgba(255,255,255,.9),0 0 16px 3px rgba(255,255,255,.38),0 0 42px 6px rgba(255,255,255,.16),0 12px 26px rgba(0,0,0,.55);animation:halo 2.6s ease-in-out infinite}
+@keyframes halo{50%{box-shadow:0 0 0 1.5px rgba(255,255,255,.75),0 0 24px 6px rgba(255,255,255,.5),0 0 60px 12px rgba(255,255,255,.2),0 12px 26px rgba(0,0,0,.55)}}
+@media (prefers-reduced-motion:reduce){.card.fresh .poster{animation:none}}
+.card.fresh .l2{color:var(--ink);font-weight:600}
 .shelf.enter .card{animation:rise .45s cubic-bezier(.2,.8,.2,1) both;animation-delay:calc(var(--i,0) * 30ms)}
 @keyframes rise{from{opacity:0;transform:translateY(10px)}}
 .card:active .poster{transform:scale(.97)}
@@ -348,7 +353,14 @@ async function refreshStale(force) {
 
 /* ---------- shelf ---------- */
 const shelf = $('shelf'), results = $('results');
-const order = () => Object.values(db.shows).sort((a, b) => (b.p.at || b.added) - (a.p.at || a.added));
+// newest aired episode is past where you stopped, and it came out in the last 10 days
+function freshEp(sh) {
+  if (sh.manual || !sh.prev || !(sh.p.e > 0)) return null;
+  const pa = parseAir(sh.prev); if (!pa || Date.now() - pa.d > 10 * DAY || pa.d > Date.now()) return null;
+  const ps = sh.prev.season, pn = sh.prev.number, s = sh.p.s || 1;
+  return ps > s || (ps === s && pn > sh.p.e) ? sh.prev : null;
+}
+const order = () => Object.values(db.shows).sort((a, b) => (!!freshEp(b) - !!freshEp(a)) || (b.p.at || b.added) - (a.p.at || a.added));
 function posterHTML(sh, withBar) {
   const src = sh.cimg || sh.img;
   const img = src ? `<img src="${esc(src)}" alt="" loading="lazy" decoding="async">` : `<div class="ph">${esc(sh.name)}</div>`;
@@ -370,7 +382,9 @@ function render() {
   shelf.innerHTML = list.map((sh, i) => {
     const ni = nextInfo(sh);
     const p = sh.p.e > 0 ? `S${sh.p.s || 1} E${sh.p.e}` + (sh.p.t > 0 ? ' · ' + fmtTime(sh.p.t) : '') : 'Δεν ξεκίνησε';
-    return `<button class="card" type="button" data-id="${sh.id}" style="--i:${i}" aria-label="${esc(sh.name)}">${posterHTML(sh, true)}<div class="l1">${esc(p)}</div><div class="l2${ni.soon ? ' soon' : ''}">${esc(ni.short || ' ')}</div></button>`;
+    const fr = freshEp(sh);
+    const l2 = fr ? `Βγήκε: S${fr.season} E${fr.number}` : (ni.short || ' ');
+    return `<button class="card${fr ? ' fresh' : ''}" type="button" data-id="${sh.id}" style="--i:${i}" aria-label="${esc(sh.name)}${fr ? ', νέο επεισόδιο' : ''}">${posterHTML(sh, true)}<div class="l1">${esc(p)}</div><div class="l2${ni.soon ? ' soon' : ''}">${esc(l2)}</div></button>`;
   }).join('');
 }
 let lpT = 0, lpFired = false, lpXY = null, lpCard = null;
