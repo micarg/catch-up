@@ -28,7 +28,9 @@
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--ui);-webkit-font-smoothing:antialiased;-webkit-text-size-adjust:100%}
-body{min-height:100vh;overscroll-behavior-y:none}
+body{min-height:100vh;overscroll-behavior-y:none;-webkit-user-select:none;user-select:none}
+input,textarea{-webkit-user-select:text;user-select:text}
+.card,.card *,img{-webkit-touch-callout:none;-webkit-user-drag:none}
 body.locked{overflow:hidden}
 button{font:inherit;color:inherit;cursor:pointer}
 [hidden]{display:none!important}
@@ -135,6 +137,16 @@ button{font:inherit;color:inherit;cursor:pointer}
 .row.manual .th{display:grid;place-items:center;color:var(--muted);font-size:22px;font-weight:300}
 .rm{display:block;margin:6px auto 0;border:0;background:none;color:var(--dim);font-size:14px;padding:10px 14px}
 .rm.arm{color:#ff6961}
+.card.held .poster{transform:scale(.95);box-shadow:0 0 0 1px rgba(255,255,255,.35),0 12px 26px rgba(0,0,0,.55)}
+.menu{position:fixed;left:16px;right:16px;bottom:calc(var(--sb) + 16px);z-index:21;margin:0 auto;max-width:420px;border-radius:24px;padding:8px;background:var(--glass-strong);-webkit-backdrop-filter:var(--blur);backdrop-filter:var(--blur);border:.5px solid var(--stroke);box-shadow:var(--hi),0 20px 50px rgba(0,0,0,.6);transform:translateY(20px);opacity:0;transition:transform .28s cubic-bezier(.2,.8,.2,1),opacity .2s}
+.menu.on{transform:none;opacity:1}
+.menu .mt{display:flex;align-items:center;gap:12px;padding:8px 8px 12px}
+.menu .mt .poster{width:40px;border-radius:7px;flex:none}
+.menu .ph{font-size:0}
+.menu .mt b{font-size:16px;line-height:1.25;min-width:0;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.menu button{display:block;width:100%;height:50px;border:0;border-radius:16px;font-size:16px;font-weight:600;background:rgba(255,255,255,.08);margin-top:6px}
+.menu .del{color:#ff6961}
+.glink{display:inline-block;margin-top:8px;font-size:13.5px;font-weight:600;color:var(--ink);text-decoration:none;padding:6px 12px;border-radius:999px;background:var(--glass);border:.5px solid var(--stroke);box-shadow:var(--hi)}
 </style>
 </head>
 <body>
@@ -152,6 +164,7 @@ button{font:inherit;color:inherit;cursor:pointer}
 <input type="file" id="pf" accept="image/*" hidden>
 <input type="file" id="cf" accept="image/*" capture="environment" hidden>
 <div class="scrim" id="scrim" hidden></div>
+<div class="menu" id="menu" role="dialog" aria-modal="true" hidden></div>
 <div class="sheet" id="sheet" role="dialog" aria-modal="true" hidden>
   <div class="art" id="art"></div>
   <div class="grab" id="grab"><i></i></div>
@@ -353,7 +366,36 @@ function render() {
     return `<button class="card" type="button" data-id="${sh.id}" style="--i:${i}" aria-label="${esc(sh.name)}">${posterHTML(sh, true)}<div class="l1">${esc(p)}</div><div class="l2${ni.soon ? ' soon' : ''}">${esc(ni.short || ' ')}</div></button>`;
   }).join('');
 }
-shelf.addEventListener('click', e => { const c = e.target.closest('.card'); if (c) openSheet(+c.dataset.id); });
+let lpT = 0, lpFired = false, lpXY = null, lpCard = null;
+const lpCancel = () => { clearTimeout(lpT); if (lpCard) lpCard.classList.remove('held'); lpCard = null; };
+shelf.addEventListener('pointerdown', e => {
+  const c = e.target.closest('.card'); if (!c) return;
+  lpFired = false; lpXY = [e.clientX, e.clientY]; lpCard = c; c.classList.add('held');
+  lpT = setTimeout(() => { lpFired = true; if (navigator.vibrate) try { navigator.vibrate(12); } catch (x) {} const id = +c.dataset.id; lpCancel(); openMenu(id); }, 480);
+});
+shelf.addEventListener('pointermove', e => { if (lpXY && Math.hypot(e.clientX - lpXY[0], e.clientY - lpXY[1]) > 10) lpCancel(); });
+['pointerup', 'pointercancel', 'pointerleave'].forEach(t => shelf.addEventListener(t, lpCancel));
+window.addEventListener('scroll', lpCancel, { passive: true });
+shelf.addEventListener('contextmenu', e => { const c = e.target.closest('.card'); if (!c) return; e.preventDefault(); if (!lpFired) { lpFired = true; lpCancel(); openMenu(+c.dataset.id); } });
+shelf.addEventListener('click', e => { const c = e.target.closest('.card'); if (!c) return; if (lpFired) { lpFired = false; return; } openSheet(+c.dataset.id); });
+const menu = $('menu');
+function openMenu(id) {
+  const sh = db.shows[id]; if (!sh) return;
+  menu.dataset.id = id;
+  menu.innerHTML = `<div class="mt">${posterHTML(sh, false)}<b>${esc(sh.name)}</b></div><button class="del" type="button" data-m="del">Αφαίρεση από τη βιβλιοθήκη</button><button type="button" data-m="no">Άκυρο</button>`;
+  scrim.hidden = false; menu.hidden = false;
+  requestAnimationFrame(() => requestAnimationFrame(() => { scrim.classList.add('on'); menu.classList.add('on'); }));
+}
+function closeMenu() {
+  if (menu.hidden) return;
+  menu.classList.remove('on'); scrim.classList.remove('on');
+  setTimeout(() => { menu.hidden = true; if (openId == null) scrim.hidden = true; }, 300);
+}
+menu.addEventListener('click', e => {
+  const b = e.target.closest('[data-m]'); if (!b) return;
+  if (b.dataset.m === 'del') { delete db.shows[+menu.dataset.id]; save(); render(); }
+  closeMenu();
+});
 
 /* ---------- search ---------- */
 const q = $('q'), qx = $('qx');
@@ -414,7 +456,7 @@ results.addEventListener('click', e => {
   if (r.dataset.manual) {
     const id = -Date.now(), name = q.value.trim();
     db.shows[id] = { id, name, manual: true, img: '', imgL: '', network: '', status: '', premiered: '', lang: '', runtime: 0, added: Date.now(), p: { s: 1, e: 0, t: 0, at: 0 }, fetched: Date.now() };
-    save(); q.value = ''; lastHits = []; showSearch(false); q.blur(); render(); openSheet(id); return;
+    save(); q.value = ''; lastHits = []; showSearch(false); q.blur(); render(); openSheet(id); findPoster(id); return;
   }
   const id = +r.dataset.id;
   if (!db.shows[id]) {
@@ -449,7 +491,7 @@ function closeSheet() {
   setTimeout(() => { if (openId == null) { scrim.hidden = true; sheet.hidden = true; } }, 380);
   render();
 }
-scrim.addEventListener('click', closeSheet);
+scrim.addEventListener('click', () => { if (!menu.hidden) closeMenu(); else closeSheet(); });
 $('sx').addEventListener('click', closeSheet);
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeSheet(); });
 
@@ -467,7 +509,7 @@ function renderSheet() {
   const airedTxt = sh.aired && !(e > mx0) ? (multi(sh) && mx ? `Στη σεζόν ${s} παίχτηκαν ${mx} επεισόδια` : `Έχουν παιχτεί ${sh.aired.total} επεισόδια`) : '';
   const tm = Math.floor((sh.p.t || 0) / 60), ts = (sh.p.t || 0) % 60;
   sbody.innerHTML = `
-    <div class="hd"><div data-a="poster" style="position:relative;flex:none" role="button" aria-label="Αλλαγή αφίσας">${posterHTML(sh, false).replace('<div class="ph">' + esc(sh.name), '<div class="ph">' + (sh.manual && !sh.cimg ? 'Πάτα για αφίσα' : esc(sh.name)))}<span class="pen"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10.5 2.5l3 3L5 14H2v-3z"/></svg></span></div><div style="flex:1;min-width:0">${sh.manual ? `<textarea class="nm" id="vn" rows="2" aria-label="Όνομα σειράς" autocomplete="off" spellcheck="false">${esc(sh.name)}</textarea>` : `<h2>${esc(sh.name)}</h2>`}<div class="meta">${esc(meta)}${airedTxt ? '<br>' + esc(airedTxt) : ''}</div></div></div>
+    <div class="hd"><div data-a="poster" style="position:relative;flex:none" role="button" aria-label="Αλλαγή αφίσας">${posterHTML(sh, false).replace('<div class="ph">' + esc(sh.name), '<div class="ph">' + (sh.manual && !sh.cimg ? 'Πάτα για αφίσα' : esc(sh.name)))}<span class="pen"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10.5 2.5l3 3L5 14H2v-3z"/></svg></span></div><div style="flex:1;min-width:0">${sh.manual ? `<textarea class="nm" id="vn" rows="2" aria-label="Όνομα σειράς" autocomplete="off" spellcheck="false">${esc(sh.name)}</textarea>` : `<h2>${esc(sh.name)}</h2>`}<div class="meta">${esc(meta)}${airedTxt ? '<br>' + esc(airedTxt) : ''}</div>${sh.manual && !sh.img && !sh.cimg && sh.posterTried ? `<a class="glink" href="https://www.google.com/search?tbm=isch&q=${encodeURIComponent(sh.name + ' σειρά αφίσα')}" target="_blank" rel="noopener">Βρες αφίσα στο Google</a>` : ''}</div></div>
     <div class="box"><div class="k">${esc(ni.k)}</div><div class="v">${esc(ni.long)}${ni.sub ? `<small>${esc(ni.sub)}</small>` : ''}</div></div>
     <div class="box">
       <div class="kh"><div class="k">Έμεινα</div><button class="cam" type="button" data-a="cam" aria-label="Φωτογραφία της τηλεόρασης"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"><path d="M4 8h3l1.6-2.2h6.8L17 8h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13.2" r="3.6"/></svg>Φωτό TV</button></div>
@@ -549,6 +591,29 @@ function loadPoster(file) {
     im.onerror = () => { URL.revokeObjectURL(u); rej(); };
     im.src = u;
   });
+}
+/* ---------- poster for shows added by hand: Wikipedia, only on an exact title match ---------- */
+const foldT = t => String(t).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\(.*?\)/g, '').replace(/^(οι|η|ο|το|τα|the)\s+/, '').replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+async function findPoster(id) {
+  const sh = db.shows[id]; if (!sh || sh.img || sh.cimg) return;
+  sh.posterTried = Date.now(); save();
+  const want = foldT(sh.name);
+  for (const host of ['el.wikipedia.org', 'en.wikipedia.org']) {
+    for (const extra of [' τηλεοπτική σειρά', '']) {
+      try {
+        const u = `https://${host}/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(sh.name + extra)}&gsrlimit=8&prop=pageimages&piprop=thumbnail&pithumbsize=500&format=json&origin=*`;
+        const j = await fetch(u).then(r => r.json());
+        const hit = Object.values((j.query || {}).pages || {}).sort((a, b) => a.index - b.index).find(p => p.thumbnail && foldT(p.title) === want);
+        if (hit) {
+          const cur = db.shows[id]; if (!cur || cur.img || cur.cimg) return;
+          cur.img = hit.thumbnail.source; save(); render();
+          if (openId === id) { const y = sbody.scrollTop; renderSheet(); sbody.scrollTop = y; }
+          return;
+        }
+      } catch (e) {}
+    }
+  }
+  if (openId === id) { const y = sbody.scrollTop; renderSheet(); sbody.scrollTop = y; }
 }
 /* ---------- read the TV photo (on the phone, with Tesseract) ---------- */
 let scanResult = null, ocrWorker = null;
@@ -661,6 +726,7 @@ sbody.addEventListener('focusin', ev => { if (ev.target.classList && ev.target.c
 /* ---------- boot ---------- */
 render();
 refreshStale(false);
+Object.values(db.shows).filter(x => x.manual && !x.img && !x.cimg && !x.posterTried).forEach(x => findPoster(x.id));
 document.addEventListener('visibilitychange', () => { if (!document.hidden) { render(); refreshStale(false); } });
 setInterval(() => { if (!document.hidden && openId == null) render(); }, 60e3);
 if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
