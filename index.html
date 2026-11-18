@@ -104,6 +104,8 @@ button{font:inherit;color:inherit;cursor:pointer}
 .step{display:flex;align-items:center;gap:6px}
 .sb{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;padding:0;font-size:22px;font-weight:400;line-height:1;background:var(--glass);border:.5px solid var(--stroke);box-shadow:var(--hi),0 4px 12px rgba(0,0,0,.3)}
 .sb:active{transform:scale(.92)}
+.sb:disabled{opacity:.3;pointer-events:none}
+.done:disabled{background:rgba(255,255,255,.1);color:var(--muted);box-shadow:var(--hi)}
 .num{width:58px;height:40px;border:0;background:none;color:var(--ink);text-align:center;font:600 26px var(--ui);font-variant-numeric:tabular-nums;outline:none;padding:0;border-radius:10px}
 .num:focus{background:rgba(255,255,255,.08)}
 .time{display:flex;align-items:center;gap:2px}
@@ -205,6 +207,24 @@ const epLabel = (sh, s, e) => multi(sh) ? `S${s} E${e}` : `E${e}`;
 const year = sh => sh.premiered ? sh.premiered.slice(0, 4) : '';
 const netName = sh => sh.network || '';
 const maxAired = (sh, s) => sh.aired && sh.aired.by ? sh.aired.by[s] || 0 : 0;
+// Cap season/episode at what has aired, but only when TVmaze's list looks complete:
+// a scheduled next episode, an ended show/season, or an announced next season.
+// Daily Greek shows that TVmaze stopped updating stay uncapped.
+function limits(sh) {
+  if (sh.manual || !sh.aired || !sh.aired.total) return null;
+  const lastS = sh.aired.maxS;
+  const cur = (sh.seasons || []).find(x => x.n === lastS);
+  const trusted = sh.next || sh.status === 'Ended' || (cur && cur.end && new Date(cur.end + 'T23:59:59') < new Date()) || (sh.seasons || []).some(x => x.n > lastS);
+  return trusted ? { S: lastS, E: n => maxAired(sh, n) } : null;
+}
+function clampP(sh) {
+  const L = limits(sh); if (!L) return false;
+  const p = sh.p, b = JSON.stringify(p);
+  if ((p.s || 1) > L.S) p.s = L.S;
+  const m = L.E(p.s || 1);
+  if (m && p.e > m) { p.e = m; p.t = 0; }
+  return JSON.stringify(p) !== b;
+}
 
 function nextInfo(sh) {
   if (sh.manual) return { short: sh.network || '', long: 'Δεν είναι στη βάση δεδομένων', sub: 'Τη σειρά την πρόσθεσες με το χέρι, οπότε δεν ξέρω πότε βγαίνει το επόμενο', k: 'Επόμενο επεισόδιο' };
@@ -278,6 +298,7 @@ async function refresh(id) {
     sh.aired = { total, by, maxS };
     sh.names = names;
     if (!sh.p.s) sh.p.s = maxS || (sh.seasons[0] && sh.seasons[0].n) || 1;
+    clampP(sh);
     sh.fetched = Date.now();
     save(); render();
     if (openId === id) { if (sbody.contains(document.activeElement) && document.activeElement.tagName === 'INPUT') sheetDirty = true; else renderSheet(); }
@@ -419,6 +440,8 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') closeSheet()
 
 function renderSheet() {
   const sh = db.shows[openId]; if (!sh) return;
+  if (clampP(sh)) save();
+  const L = limits(sh);
   const art = sh.cimg || sh.img;
   $('art').style.backgroundImage = art ? `url("${art}")` : 'none';
   const ni = nextInfo(sh);
@@ -437,17 +460,17 @@ function renderSheet() {
       <div class="line"><div class="lab">Σεζόν</div><div class="step">
         <button class="sb" type="button" data-a="s-" aria-label="Προηγούμενη σεζόν">−</button>
         <input class="num" id="vs" inputmode="numeric" pattern="[0-9]*" value="${s}" aria-label="Σεζόν">
-        <button class="sb" type="button" data-a="s+" aria-label="Επόμενη σεζόν">+</button></div></div>` : ''}
+        <button class="sb" type="button" data-a="s+" aria-label="Επόμενη σεζόν"${L && s >= L.S ? ' disabled' : ''}>+</button></div></div>` : ''}
       <div class="line"><div class="lab">Επεισόδιο${mx ? `<small>από ${mx}${nm ? ' · ' + esc(nm) : ''}</small>` : (nm ? `<small>${esc(nm)}</small>` : '')}</div><div class="step">
         <button class="sb" type="button" data-a="e-" aria-label="Προηγούμενο επεισόδιο">−</button>
         <input class="num" id="ve" inputmode="numeric" pattern="[0-9]*" value="${e || ''}" placeholder="0" aria-label="Επεισόδιο">
-        <button class="sb" type="button" data-a="e+" aria-label="Επόμενο επεισόδιο">+</button></div></div>
+        <button class="sb" type="button" data-a="e+" aria-label="Επόμενο επεισόδιο"${L && L.E(s) && e >= L.E(s) ? ' disabled' : ''}>+</button></div></div>
       <div class="line"><div class="lab">Λεπτό<small>λεπτά : δευτ.</small></div><div class="time">
         <input class="num" id="vm" inputmode="numeric" pattern="[0-9]*" value="${sh.p.t ? tm : ''}" placeholder="0" aria-label="Λεπτά">
         <span>:</span>
         <input class="num ss" id="vss" inputmode="numeric" pattern="[0-9]*" value="${sh.p.t ? String(ts).padStart(2, '0') : ''}" placeholder="00" aria-label="Δευτερόλεπτα"></div></div>
     </div>
-    <button class="done" type="button" data-a="fin">${e > 0 ? 'Το τελείωσα · πάμε στο επόμενο' : 'Ξεκινώ από το 1ο επεισόδιο'}</button>
+    ${L && s >= L.S && L.E(s) && e >= L.E(s) ? `<button class="done" type="button" disabled>Είσαι στο τελευταίο επεισόδιο</button>` : `<button class="done" type="button" data-a="fin">${e > 0 ? 'Το τελείωσα · πάμε στο επόμενο' : 'Ξεκινώ από το 1ο επεισόδιο'}</button>`}
     <div class="saved" id="saved">Αποθηκεύτηκε</div>
     <button class="rm" type="button" data-a="rm">Αφαίρεση από τη βιβλιοθήκη</button>`;
 }
@@ -466,14 +489,17 @@ sbody.addEventListener('click', ev => {
   const sh = db.shows[openId]; if (!sh) return;
   const p = sh.p, a = b.dataset.a;
   if (a === 's-') { if ((p.s || 1) > 1) { p.s = (p.s || 1) - 1; p.e = p.e ? 1 : 0; p.t = 0; } }
-  else if (a === 's+') { p.s = (p.s || 1) + 1; p.e = p.e ? 1 : 0; p.t = 0; }
+  else if (a === 's+') { const L = limits(sh); if (L && (p.s || 1) >= L.S) return; p.s = (p.s || 1) + 1; p.e = p.e ? 1 : 0; p.t = 0; }
   else if (a === 'e-') { if (p.e > 1) { p.e--; p.t = 0; } else if (p.e === 1) { p.e = 0; p.t = 0; } }
-  else if (a === 'e+') { p.e = (p.e || 0) + 1; p.t = 0; }
+  else if (a === 'e+') { const L = limits(sh), m = L && L.E(p.s || 1); if (m && (p.e || 0) >= m) return; p.e = (p.e || 0) + 1; p.t = 0; }
   else if (a === 'fin') {
     if (!p.s) p.s = 1;
     const mx = maxAired(sh, p.s);
     const nextS = (sh.seasons || []).some(x => x.n === p.s + 1) && maxAired(sh, p.s + 1) > 0;
-    if (p.e > 0 && mx && p.e >= mx && nextS) { p.s++; p.e = 1; } else p.e = (p.e || 0) + 1;
+    const L = limits(sh);
+    if (p.e > 0 && mx && p.e >= mx && nextS) { p.s++; p.e = 1; }
+    else if (L && mx && p.e >= mx) return;
+    else p.e = (p.e || 0) + 1;
     p.t = 0;
   }
   else if (a === 'poster') { $('pf').click(); return; }
@@ -517,8 +543,8 @@ sbody.addEventListener('input', ev => {
   el.value = el.value.replace(/\D/g, '').slice(0, el.id === 'vss' ? 2 : 4);
   const sh = db.shows[openId]; if (!sh) return;
   const p = sh.p;
-  if (el.id === 'vs') p.s = Math.max(1, int(el.value) || 1);
-  if (el.id === 've') { p.e = int(el.value); const f = sbody.querySelector('[data-a="fin"]'); if (f) f.textContent = p.e > 0 ? 'Το τελείωσα · πάμε στο επόμενο' : 'Ξεκινώ από το 1ο επεισόδιο'; }
+  if (el.id === 'vs') { p.s = Math.max(1, int(el.value) || 1); if (clampP(sh)) { el.value = p.s; const y = sbody.scrollTop; setTimeout(() => { renderSheet(); sbody.scrollTop = y; }, 0); } }
+  if (el.id === 've') { p.e = int(el.value); if (clampP(sh)) el.value = p.e; const f = sbody.querySelector('[data-a="fin"]'); if (f) f.textContent = p.e > 0 ? 'Το τελείωσα · πάμε στο επόμενο' : 'Ξεκινώ από το 1ο επεισόδιο'; }
   if (el.id === 'vm' || el.id === 'vss') {
     const m = int($('vm').value), s = Math.min(59, int($('vss').value));
     p.t = m * 60 + s;
