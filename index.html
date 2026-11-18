@@ -59,6 +59,9 @@ button{font:inherit;color:inherit;cursor:pointer}
 @keyframes halo{50%{box-shadow:0 0 0 1.5px rgba(255,255,255,.75),0 0 24px 6px rgba(255,255,255,.5),0 0 60px 12px rgba(255,255,255,.2),0 12px 26px rgba(0,0,0,.55)}}
 @media (prefers-reduced-motion:reduce){.card.fresh .poster{animation:none}}
 .card.fresh .l2{color:var(--ink);font-weight:600}
+/* you watched the whole thing and the show has ended: poster goes black and white */
+.card.gone .poster img,.hd.gone .poster img{filter:grayscale(1) contrast(1.05) brightness(.85)}
+.card.gone .l1{color:var(--muted)}
 .shelf.enter .card{animation:rise .45s cubic-bezier(.2,.8,.2,1) both;animation-delay:calc(var(--i,0) * 30ms)}
 @keyframes rise{from{opacity:0;transform:translateY(10px)}}
 .card:active .poster{transform:scale(.97)}
@@ -360,7 +363,8 @@ function freshEp(sh) {
   const ps = sh.prev.season, pn = sh.prev.number, s = sh.p.s || 1;
   return ps > s || (ps === s && pn > sh.p.e) ? sh.prev : null;
 }
-const order = () => Object.values(db.shows).sort((a, b) => (!!freshEp(b) - !!freshEp(a)) || (b.p.at || b.added) - (a.p.at || a.added));
+const watchedAll = sh => !!(sh.p.done && sh.status === 'Ended');
+const order = () => Object.values(db.shows).sort((a, b) => (watchedAll(a) - watchedAll(b)) || (!!freshEp(b) - !!freshEp(a)) || (b.p.at || b.added) - (a.p.at || a.added));
 function posterHTML(sh, withBar) {
   const src = sh.cimg || sh.img;
   const img = src ? `<img src="${esc(src)}" alt="" loading="lazy" decoding="async">` : `<div class="ph">${esc(sh.name)}</div>`;
@@ -383,8 +387,9 @@ function render() {
     const ni = nextInfo(sh);
     const p = sh.p.e > 0 ? `S${sh.p.s || 1} E${sh.p.e}` + (sh.p.t > 0 ? ' · ' + fmtTime(sh.p.t) : '') : 'Δεν ξεκίνησε';
     const fr = freshEp(sh);
-    const l2 = fr ? `Βγήκε: S${fr.season} E${fr.number}` : (ni.short || ' ');
-    return `<button class="card${fr ? ' fresh' : ''}" type="button" data-id="${sh.id}" style="--i:${i}" aria-label="${esc(sh.name)}${fr ? ', νέο επεισόδιο' : ''}">${posterHTML(sh, true)}<div class="l1">${esc(p)}</div><div class="l2${ni.soon ? ' soon' : ''}">${esc(l2)}</div></button>`;
+    const gone = watchedAll(sh);
+    const l2 = gone ? 'Την είδες όλη' : fr ? `Βγήκε: S${fr.season} E${fr.number}` : (ni.short || ' ');
+    return `<button class="card${fr ? ' fresh' : ''}${gone ? ' gone' : ''}" type="button" data-id="${sh.id}" style="--i:${i}" aria-label="${esc(sh.name)}${fr ? ', νέο επεισόδιο' : ''}">${posterHTML(sh, true)}<div class="l1">${esc(p)}</div><div class="l2${ni.soon ? ' soon' : ''}">${esc(l2)}</div></button>`;
   }).join('');
 }
 let lpT = 0, lpFired = false, lpXY = null, lpCard = null;
@@ -530,7 +535,7 @@ function renderSheet() {
   const airedTxt = sh.aired && !(e > mx0) ? (multi(sh) && mx ? `Στη σεζόν ${s} παίχτηκαν ${mx} επεισόδια` : `Έχουν παιχτεί ${sh.aired.total} επεισόδια`) : '';
   const T = sh.p.t || 0, th = Math.floor(T / 3600), tm = Math.floor(T % 3600 / 60), ts = T % 60;
   sbody.innerHTML = `
-    <div class="hd"><div data-a="poster" style="position:relative;flex:none" role="button" aria-label="Αλλαγή αφίσας">${posterHTML(sh, false).replace('<div class="ph">' + esc(sh.name), '<div class="ph">' + (sh.manual && !sh.cimg ? 'Πάτα για αφίσα' : esc(sh.name)))}<span class="pen"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10.5 2.5l3 3L5 14H2v-3z"/></svg></span></div><div style="flex:1;min-width:0">${sh.manual ? `<textarea class="nm" id="vn" rows="2" aria-label="Όνομα σειράς" autocomplete="off" spellcheck="false">${esc(sh.name)}</textarea>` : `<h2>${esc(sh.name)}</h2>`}<div class="meta">${esc(meta)}${airedTxt ? '<br>' + esc(airedTxt) : ''}</div>${sh.manual && !sh.img && !sh.cimg && sh.posterTried ? `<a class="glink" href="https://www.google.com/search?tbm=isch&q=${encodeURIComponent(sh.name + ' σειρά αφίσα')}" target="_blank" rel="noopener">Βρες αφίσα στο Google</a>` : ''}</div></div>
+    <div class="hd${watchedAll(sh) ? ' gone' : ''}"><div data-a="poster" style="position:relative;flex:none" role="button" aria-label="Αλλαγή αφίσας">${posterHTML(sh, false).replace('<div class="ph">' + esc(sh.name), '<div class="ph">' + (sh.manual && !sh.cimg ? 'Πάτα για αφίσα' : esc(sh.name)))}<span class="pen"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10.5 2.5l3 3L5 14H2v-3z"/></svg></span></div><div style="flex:1;min-width:0">${sh.manual ? `<textarea class="nm" id="vn" rows="2" aria-label="Όνομα σειράς" autocomplete="off" spellcheck="false">${esc(sh.name)}</textarea>` : `<h2>${esc(sh.name)}</h2>`}<div class="meta">${esc(meta)}${airedTxt ? '<br>' + esc(airedTxt) : ''}</div>${sh.manual && !sh.img && !sh.cimg && sh.posterTried ? `<a class="glink" href="https://www.google.com/search?tbm=isch&q=${encodeURIComponent(sh.name + ' σειρά αφίσα')}" target="_blank" rel="noopener">Βρες αφίσα στο Google</a>` : ''}</div></div>
     <div class="box"><div class="k">${esc(ni.k)}</div><div class="v">${esc(ni.long)}${ni.sub ? `<small>${esc(ni.sub)}</small>` : ''}</div></div>
     <div class="box">
       <div class="kh"><div class="k">Έμεινα</div><button class="cam" type="button" data-a="cam" aria-label="Φωτογραφία της τηλεόρασης"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"><path d="M4 8h3l1.6-2.2h6.8L17 8h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13.2" r="3.6"/></svg>Φωτό TV</button></div>
@@ -552,7 +557,9 @@ function renderSheet() {
         <input class="num ss" id="vss" inputmode="numeric" pattern="[0-9]*" value="${T ? String(ts).padStart(2, '0') : ''}" placeholder="00" aria-label="Δευτερόλεπτα"></div></div>
     </div>
     <button class="save" type="button" data-a="save">Αποθήκευση</button>
-    ${L && s >= L.S && L.E(s) && e >= L.E(s) ? `<button class="done sec" type="button" disabled>Είσαι στο τελευταίο επεισόδιο</button>` : `<button class="done sec" type="button" data-a="fin">${e > 0 ? 'Το τελείωσα · πάμε στο επόμενο' : 'Ξεκινώ από το 1ο επεισόδιο'}</button>`}
+    ${L && s >= L.S && L.E(s) && e >= L.E(s) ? (sh.status === 'Ended'
+      ? (sh.p.done ? `<button class="done sec" type="button" disabled>✓ Την είδες όλη</button>` : `<button class="done sec" type="button" data-a="end">Το τελείωσα · τέλος σειράς</button>`)
+      : `<button class="done sec" type="button" disabled>Είσαι στο τελευταίο επεισόδιο</button>`) : `<button class="done sec" type="button" data-a="fin">${e > 0 ? 'Το τελείωσα · πάμε στο επόμενο' : 'Ξεκινώ από το 1ο επεισόδιο'}</button>`}
     <div class="saved" id="saved">Αποθηκεύτηκε</div>
     <button class="rm" type="button" data-a="rm">Αφαίρεση από τη βιβλιοθήκη</button>`;
 }
@@ -570,6 +577,8 @@ sbody.addEventListener('click', ev => {
   const b = ev.target.closest('[data-a]'); if (!b) return;
   const sh = db.shows[openId]; if (!sh) return;
   const p = sh.p, a = b.dataset.a;
+  if (/^(s-|s\+|e-|e\+|fin|scan-ok)$/.test(a)) p.done = false;
+  if (a === 'end') { p.done = true; p.t = 0; commit(true); render(); return; }
   if (a === 's-') { if ((p.s || 1) > 1) { p.s = (p.s || 1) - 1; p.e = p.e ? 1 : 0; p.t = 0; } }
   else if (a === 's+') { const L = limits(sh); if (L && (p.s || 1) >= L.S) return; p.s = (p.s || 1) + 1; p.e = p.e ? 1 : 0; p.t = 0; }
   else if (a === 'e-') { if (p.e > 1) { p.e--; p.t = 0; } else if (p.e === 1) { p.e = 0; p.t = 0; } }
@@ -721,8 +730,9 @@ sbody.addEventListener('input', ev => {
   const el = ev.target; if (!el.classList.contains('num')) return;
   el.value = el.value.replace(/\D/g, '').slice(0, el.id === 'vss' || el.id === 'vm' || el.id === 'vh' ? 2 : 4);
   const sh = db.shows[openId]; if (!sh) return;
-  const p = sh.p;
+  const p = sh.p; p.done = false;
   if (el.id === 'vs') { p.s = Math.max(1, int(el.value) || 1); if (clampP(sh)) { el.value = p.s; const y = sbody.scrollTop; setTimeout(() => { renderSheet(); sbody.scrollTop = y; }, 0); } }
+  if (el.id === 've' || el.id === 'vs') sheetDirty = true;
   if (el.id === 've') { p.e = int(el.value); if (clampP(sh)) el.value = p.e; const f = sbody.querySelector('[data-a="fin"]'); if (f) f.textContent = p.e > 0 ? 'Το τελείωσα · πάμε στο επόμενο' : 'Ξεκινώ από το 1ο επεισόδιο'; }
   if (el.id === 'vh' || el.id === 'vm' || el.id === 'vss') {
     const m = int($('vm').value) + int($('vh').value) * 60, s = Math.min(59, int($('vss').value));
