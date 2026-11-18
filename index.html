@@ -218,7 +218,11 @@ function nextInfo(sh) {
   const pa = parseAir(sh.prev);
   if (pa && Date.now() - pa.d < 14 * DAY) return { short: 'Νέο: χωρίς πρόγραμμα', long: 'Δεν βγήκε ακόμα πρόγραμμα', sub: 'Τελευταίο: ' + epLabel(sh, sh.prev.season, sh.prev.number) + ' · ' + whenLong(pa), k: 'Επόμενο επεισόδιο' };
   if (!sh.fetched) return { short: '', long: '…', sub: '', k: 'Επόμενο επεισόδιο' };
-  return { short: 'Νέα σεζόν: άγνωστο', long: 'Η σεζόν τελείωσε', sub: 'Η επόμενη δεν έχει ανακοινωθεί ακόμα', k: 'Νέα σεζόν' };
+  // only call the season finished when TVmaze says it ended; daily Greek shows often just aren't updated there
+  const cur = (sh.seasons || []).find(x => x.n === lastS);
+  if (cur && cur.end && new Date(cur.end + 'T23:59:59') < new Date())
+    return { short: 'Νέα σεζόν: άγνωστο', long: 'Η σεζόν τελείωσε', sub: 'Η επόμενη δεν έχει ανακοινωθεί ακόμα', k: 'Νέα σεζόν' };
+  return { short: 'Νέο: χωρίς πρόγραμμα', long: 'Δεν υπάρχει πρόγραμμα ακόμα', sub: 'Η βάση δεδομένων δεν έχει ενημερωθεί για τα νέα επεισόδια', k: 'Επόμενο επεισόδιο' };
 }
 
 /* ---------- TVmaze ---------- */
@@ -400,10 +404,10 @@ function renderSheet() {
   $('art').style.backgroundImage = sh.img ? `url("${sh.img}")` : 'none';
   const ni = nextInfo(sh);
   const s = sh.p.s || 1, e = sh.p.e || 0;
-  const mx = maxAired(sh, s);
+  const mx0 = maxAired(sh, s), mx = e > mx0 ? 0 : mx0;
   const nm = sh.names && sh.names[s + '-' + e];
   const meta = [netName(sh), year(sh)].filter(Boolean).join(' · ');
-  const airedTxt = sh.aired ? (multi(sh) && mx ? `Στη σεζόν ${s} παίχτηκαν ${mx} επεισόδια` : `Έχουν παιχτεί ${sh.aired.total} επεισόδια`) : '';
+  const airedTxt = sh.aired && !(e > mx0) ? (multi(sh) && mx ? `Στη σεζόν ${s} παίχτηκαν ${mx} επεισόδια` : `Έχουν παιχτεί ${sh.aired.total} επεισόδια`) : '';
   const tm = Math.floor((sh.p.t || 0) / 60), ts = (sh.p.t || 0) % 60;
   sbody.innerHTML = `
     <div class="hd">${posterHTML(sh, false)}<div><h2>${esc(sh.name)}</h2><div class="meta">${esc(meta)}${airedTxt ? '<br>' + esc(airedTxt) : ''}</div></div></div>
