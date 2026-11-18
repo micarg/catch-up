@@ -47,12 +47,7 @@
     "s": 1,
     "e": 26
    },
-   "schedule": {
-    "days": [
-     1
-    ],
-    "time": "22:00"
-   }
+   "schedule": null
   }
  },
  "updated": "2026-11-18T09:49:18.894Z"

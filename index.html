@@ -245,7 +245,30 @@ const multi = sh => (sh.seasons && sh.seasons.length > 1) || (sh.p && sh.p.s > 1
 const epLabel = (sh, s, e) => multi(sh) ? `S${s} E${e}` : `E${e}`;
 const year = sh => sh.premiered ? sh.premiered.slice(0, 4) : '';
 const netName = sh => sh.network || '';
-const maxAired = (sh, s) => sh.aired && sh.aired.by ? sh.aired.by[s] || 0 : 0;
+/* episode numbers read from the channels' own sites (data/greek.json, refreshed by a GitHub Action) */
+let CH = {};
+function chFor(sh) {
+  const want = foldT(sh.name);
+  return Object.values(CH).find(r => r.latest && ((r.tvmaze && r.tvmaze === sh.id) || (r.names || []).some(n => foldT(n) === want))) || null;
+}
+async function loadChannels() {
+  try {
+    const j = await fetch('data/greek.json?t=' + Date.now(), { cache: 'no-store' }).then(r => r.json());
+    CH = j.shows || {}; render();
+    if (openId != null && !(sbody.contains(document.activeElement) && /INPUT|TEXTAREA/.test(document.activeElement.tagName))) { const y = sbody.scrollTop; renderSheet(); sbody.scrollTop = y; }
+  } catch (e) {}
+}
+function nextSlot(sc) {
+  if (!sc || !sc.days || !sc.time) return null;
+  const [h, m] = sc.time.split(':').map(Number), now = new Date();
+  for (let i = 0; i < 8; i++) { const d = new Date(now); d.setDate(d.getDate() + i); d.setHours(h, m, 0, 0); if (sc.days.includes(d.getDay()) && d > now) return d; }
+  return null;
+}
+const maxAired = (sh, s) => {
+  const tv = sh.aired && sh.aired.by ? sh.aired.by[s] || 0 : 0;
+  const ch = chFor(sh);
+  return ch && ch.latest.s === s ? Math.max(tv, ch.latest.e) : tv;
+};
 // A season counts as finished only when TVmaze knows how many episodes it has and they all aired.
 // (Its endDate is just the last date it has, so a show it stopped updating would look finished.)
 function seasonDone(sh, n) {
@@ -271,6 +294,12 @@ function clampP(sh) {
 }
 
 function nextInfo(sh) {
+  const ch = chFor(sh);
+  if (ch && !parseAir(sh.next)) {
+    const d = nextSlot(ch.schedule), nx = `E${ch.latest.e + 1}`;
+    if (d) { const a = { d, timed: true }; return { short: 'Νέο: ' + whenShort(a), long: whenLong(a), sub: `${nx} · από το site του ${ch.channel}`, soon: dayDiff(d) <= 1, k: 'Επόμενο επεισόδιο' }; }
+    return { short: `Τελευταίο: E${ch.latest.e}`, long: `Τελευταίο επεισόδιο: E${ch.latest.e}`, sub: `Από το site του ${ch.channel}`, k: 'Επεισόδια' };
+  }
   if (sh.manual) return { short: sh.network || '', long: 'Δεν είναι στη βάση δεδομένων', sub: 'Τη σειρά την πρόσθεσες με το χέρι, οπότε δεν ξέρω πότε βγαίνει το επόμενο', k: 'Επόμενο επεισόδιο' };
   const a = parseAir(sh.next);
   if (a) {
@@ -358,7 +387,13 @@ async function refreshStale(force) {
 const shelf = $('shelf'), results = $('results');
 // newest aired episode is past where you stopped, and it came out in the last 10 days
 function freshEp(sh) {
-  if (sh.manual || !sh.prev || !(sh.p.e > 0)) return null;
+  if (!(sh.p.e > 0)) return null;
+  const ch = chFor(sh);
+  if (ch) {
+    const L = ch.latest, at = ch.seen && ch.seen[L.s + '-' + L.e], s = sh.p.s || 1;
+    if (at && Date.now() - new Date(at) < 10 * DAY && (L.s > s || (L.s === s && L.e > sh.p.e))) return { season: L.s, number: L.e };
+  }
+  if (sh.manual || !sh.prev) return null;
   const pa = parseAir(sh.prev); if (!pa || Date.now() - pa.d > 10 * DAY || pa.d > Date.now()) return null;
   const ps = sh.prev.season, pn = sh.prev.number, s = sh.p.s || 1;
   return ps > s || (ps === s && pn > sh.p.e) ? sh.prev : null;
@@ -532,7 +567,8 @@ function renderSheet() {
   const mx0 = maxAired(sh, s), mx = e > mx0 ? 0 : mx0;
   const nm = sh.names && sh.names[s + '-' + e];
   const meta = [netName(sh), year(sh)].filter(Boolean).join(' · ');
-  const airedTxt = sh.aired && !(e > mx0) ? (multi(sh) && mx ? `Στη σεζόν ${s} παίχτηκαν ${mx} επεισόδια` : `Έχουν παιχτεί ${sh.aired.total} επεισόδια`) : '';
+  const chI = chFor(sh);
+  const airedTxt = chI && chI.latest.s === s && !(e > mx0) ? `Έχουν παιχτεί ${mx0} επεισόδια · ${chI.channel}` : sh.aired && !(e > mx0) ? (multi(sh) && mx ? `Στη σεζόν ${s} παίχτηκαν ${mx} επεισόδια` : `Έχουν παιχτεί ${sh.aired.total} επεισόδια`) : '';
   const T = sh.p.t || 0, th = Math.floor(T / 3600), tm = Math.floor(T % 3600 / 60), ts = T % 60;
   sbody.innerHTML = `
     <div class="hd${watchedAll(sh) ? ' gone' : ''}"><div data-a="poster" style="position:relative;flex:none" role="button" aria-label="Αλλαγή αφίσας">${posterHTML(sh, false).replace('<div class="ph">' + esc(sh.name), '<div class="ph">' + (sh.manual && !sh.cimg ? 'Πάτα για αφίσα' : esc(sh.name)))}<span class="pen"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10.5 2.5l3 3L5 14H2v-3z"/></svg></span></div><div style="flex:1;min-width:0">${sh.manual ? `<textarea class="nm" id="vn" rows="2" aria-label="Όνομα σειράς" autocomplete="off" spellcheck="false">${esc(sh.name)}</textarea>` : `<h2>${esc(sh.name)}</h2>`}<div class="meta">${esc(meta)}${airedTxt ? '<br>' + esc(airedTxt) : ''}</div>${sh.manual && !sh.img && !sh.cimg && sh.posterTried ? `<a class="glink" href="https://www.google.com/search?tbm=isch&q=${encodeURIComponent(sh.name + ' σειρά αφίσα')}" target="_blank" rel="noopener">Βρες αφίσα στο Google</a>` : ''}</div></div>
@@ -762,8 +798,9 @@ sbody.addEventListener('focusin', ev => { if (ev.target.classList && ev.target.c
 /* ---------- boot ---------- */
 render();
 refreshStale(false);
+loadChannels();
 Object.values(db.shows).filter(x => x.manual && !x.img && !x.cimg && !x.posterTried).forEach(x => findPoster(x.id));
-document.addEventListener('visibilitychange', () => { if (!document.hidden) { render(); refreshStale(false); } });
+document.addEventListener('visibilitychange', () => { if (!document.hidden) { render(); refreshStale(false); loadChannels(); } });
 setInterval(() => { if (!document.hidden && openId == null) render(); }, 60e3);
 if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
 </script>

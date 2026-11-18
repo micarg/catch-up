@@ -4,13 +4,14 @@ import { readFile, writeFile } from 'node:fs/promises';
 
 const SOURCES = [
   {
-    key: 'nterti', names: ['Ντέρτι'], tvmaze: 94478, channel: 'ANT1',
+    key: 'nterti', names: ['Ντέρτι'], tvmaze: 94478, channel: 'ANT1', readSchedule: true,
     url: 'https://www.antenna.gr/nterti',
     // links look like /watch/<id>/nterti-epeisodio-26 ; skip "sneak-preview" clips
     episodes: html => [...html.matchAll(/\/watch\/[a-z0-9]+\/nterti-epeisodio-(\d{1,4})(?![\d-])/gi)].map(m => ({ s: 1, e: +m[1] }))
   },
   {
     key: 'oi-kores-tis-aretis', names: ['Οι Κόρες της Αρετής'], channel: 'Alpha',
+    // the Alpha page also lists other shows' times, so its day/time isn't reliable: don't read it
     url: 'https://www.alphatv.gr/series/oi-kores-tis-aretis/',
     // links look like /series/oi-kores-tis-aretis/episode/782339-s1-epeisodio-24/
     episodes: html => [...html.matchAll(/\/episode\/\d+-s(\d{1,2})-epeisodio-(\d{1,4})(?!\d)/gi)].map(m => ({ s: +m[1], e: +m[2] }))
@@ -38,7 +39,7 @@ const now = new Date().toISOString();
 
 for (const src of SOURCES) {
   const prev = old.shows[src.key] || {};
-  const rec = { names: src.names, channel: src.channel, url: src.url, seen: prev.seen || {}, latest: prev.latest || null, schedule: prev.schedule || null };
+  const rec = { names: src.names, channel: src.channel, url: src.url, seen: prev.seen || {}, latest: prev.latest || null, schedule: src.readSchedule ? prev.schedule || null : null };
   if (src.tvmaze) rec.tvmaze = src.tvmaze;
   try {
     const r = await fetch(src.url, { headers: { 'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15', 'accept-language': 'el-GR,el;q=0.9' } });
@@ -47,7 +48,7 @@ for (const src of SOURCES) {
     for (const x of eps) { const k = `${x.s}-${x.e}`; if (!rec.seen[k]) rec.seen[k] = now; }
     const best = eps.sort((x, y) => y.s - x.s || y.e - x.e)[0];
     if (best && (!rec.latest || best.s > rec.latest.s || (best.s === rec.latest.s && best.e > rec.latest.e))) rec.latest = best;
-    const sc = schedule(html); if (sc) rec.schedule = sc;
+    const sc = src.readSchedule ? schedule(html) : null; if (sc) rec.schedule = sc;
     console.log(src.key, r.status, 'episodes found:', eps.length, 'latest:', JSON.stringify(rec.latest), 'schedule:', JSON.stringify(rec.schedule));
   } catch (e) { console.log(src.key, 'failed:', e.message); }
   out.shows[src.key] = rec;
