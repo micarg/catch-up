@@ -715,13 +715,15 @@ function prepImage(file, invert) {
 function parseTV(raw) {
   const txt = raw.replace(/(?<=\d)[oO](?=\d)|(?<=\d)[oO]\b/g, '0').replace(/(?<=\d)[lI|](?=\d)/g, '1').replace(/[;∶]/g, ':').replace(/\s*:\s*/g, ':');
   const out = {};
-  const se = txt.match(/\bS\s*(\d{1,2})\s*[:.\-|,]?\s*E\s*(\d{1,3})\b/i) || txt.match(/\bseason\s*(\d{1,2})\D{1,12}episode\s*(\d{1,3})/i);
+  // "S2:E5", "S1E5", "Season 1, Part 25", "Season 1 Episode 25", "Σεζόν 1 Επεισόδιο 25"
+  const se = txt.match(/\bS(?:eason)?\s*(\d{1,2})\s*[:.\-|,]?\s*(?:E|Ep|Episode|Part|Pt)\.?\s*(\d{1,4})\b/i) || txt.match(/Σεζ[οό]ν\s*(\d{1,2})\D{0,8}?(?:Επεισ[οό]διο|Επ\.?|Μέρος)\s*(\d{1,4})/i);
   if (se) { out.s = +se[1]; out.e = +se[2]; }
-  else { const ep = txt.match(/\b(?:episode|ep\.?|e)\s*(\d{1,3})\b/i); if (ep) out.e = +ep[1]; }
+  else { const ep = txt.match(/\b(?:episode|ep\.?|part|pt\.?|e)\s*(\d{1,4})\b/i) || txt.match(/(?:Επεισ[οό]διο|Μέρος)\s*(\d{1,4})/i); if (ep) out.e = +ep[1]; }
   const times = [];
   const re = /(-)?\b(\d{1,2}):([0-5]\d)(?::([0-5]\d))?\b/g; let m;
   while ((m = re.exec(txt))) {
     if (m[1]) continue;                                   // "-28:30" is time remaining
+    if (/^\s*(?:AM|PM|ΠΜ|ΜΜ)\b/i.test(txt.slice(re.lastIndex, re.lastIndex + 4))) continue;   // a clock, e.g. "8:04 PM\"
     const sec = m[4] != null ? (+m[2]) * 3600 + (+m[3]) * 60 + (+m[4]) : (+m[2]) * 60 + (+m[3]);
     if (sec < 4 * 3600) times.push({ sec, at: m.index, end: re.lastIndex });
   }
