@@ -218,14 +218,19 @@ const epLabel = (sh, s, e) => multi(sh) ? `S${s} E${e}` : `E${e}`;
 const year = sh => sh.premiered ? sh.premiered.slice(0, 4) : '';
 const netName = sh => sh.network || '';
 const maxAired = (sh, s) => sh.aired && sh.aired.by ? sh.aired.by[s] || 0 : 0;
+// A season counts as finished only when TVmaze knows how many episodes it has and they all aired.
+// (Its endDate is just the last date it has, so a show it stopped updating would look finished.)
+function seasonDone(sh, n) {
+  const x = (sh.seasons || []).find(y => y.n === n);
+  return !!(x && x.order && maxAired(sh, n) >= x.order);
+}
 // Cap season/episode at what has aired, but only when TVmaze's list looks complete:
 // a scheduled next episode, an ended show/season, or an announced next season.
 // Daily Greek shows that TVmaze stopped updating stay uncapped.
 function limits(sh) {
   if (sh.manual || !sh.aired || !sh.aired.total) return null;
   const lastS = sh.aired.maxS;
-  const cur = (sh.seasons || []).find(x => x.n === lastS);
-  const trusted = sh.next || sh.status === 'Ended' || (cur && cur.end && new Date(cur.end + 'T23:59:59') < new Date()) || (sh.seasons || []).some(x => x.n > lastS);
+  const trusted = sh.next || sh.status === 'Ended' || seasonDone(sh, lastS) || (sh.seasons || []).some(x => x.n > lastS);
   return trusted ? { S: lastS, E: n => maxAired(sh, n) } : null;
 }
 function clampP(sh) {
@@ -258,8 +263,7 @@ function nextInfo(sh) {
   if (pa && Date.now() - pa.d < 14 * DAY) return { short: 'Νέο: χωρίς πρόγραμμα', long: 'Δεν βγήκε ακόμα πρόγραμμα', sub: 'Τελευταίο: ' + epLabel(sh, sh.prev.season, sh.prev.number) + ' · ' + whenLong(pa), k: 'Επόμενο επεισόδιο' };
   if (!sh.fetched) return { short: '', long: '…', sub: '', k: 'Επόμενο επεισόδιο' };
   // only call the season finished when TVmaze says it ended; daily Greek shows often just aren't updated there
-  const cur = (sh.seasons || []).find(x => x.n === lastS);
-  if (cur && cur.end && new Date(cur.end + 'T23:59:59') < new Date())
+  if (seasonDone(sh, lastS))
     return { short: 'Νέα σεζόν: άγνωστο', long: 'Η σεζόν τελείωσε', sub: 'Η επόμενη δεν έχει ανακοινωθεί ακόμα', k: 'Νέα σεζόν' };
   return { short: 'Νέο: χωρίς πρόγραμμα', long: 'Δεν υπάρχει πρόγραμμα ακόμα', sub: 'Η βάση δεδομένων δεν έχει ενημερωθεί για τα νέα επεισόδια', k: 'Επόμενο επεισόδιο' };
 }
